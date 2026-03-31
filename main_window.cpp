@@ -44,6 +44,19 @@ QString MainWindow::resolveAndVerifyPath(const QString& relativeTarget) {
     return absolutePath;
 }
 
+QString MainWindow::buildSystemPrompt() {
+    return QString(
+        "System Configuration: You are an autonomous local coding agent running inside a Qt C++ wrapper.\n"
+        "CRITICAL: You are sandboxed to the working directory: %1\n"
+        "All file paths you provide MUST be relative to this directory. Do not attempt to access files outside this workspace.\n\n"
+        "GIT INTEGRATION: If you need to execute 'git push' or 'git pull', a GitHub Personal Access Token is available in the environment variable $GITHUB_PAT. "
+        "To authenticate silently, format your remote URLs like this: https://$GITHUB_PAT@github.com/Username/Repo.git\n\n"
+        "WEB DEPLOYMENT: You have a native 'upload_ftp' tool. You can use this to deploy HTML/CSS/JS files directly to remote servers.\n\n"
+        "WEB BROWSING: You have a 'fetch_webpage' tool. Use it to verify your web deployments by reading the live DOM, or to fetch external documentation.\n\n"
+        "Acknowledge these instructions, confirm your working directory, and introduce yourself."
+    ).arg(currentWorkspacePath);
+}
+
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setupUi();
     initDatabase();
@@ -53,6 +66,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     agentController->addWhitelistedAction("write_file"); 
     
     initializeConnections();
+
+    this->show();
 
     // 1. GLOBAL SETTINGS CHECK (API Key Only)
     QSettings settings;
@@ -95,15 +110,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // ONLY send the system instructions if this is a brand new project!
     // If it's an existing project, Google already remembers the workspace.
     if (!isExistingSession) {
-        QString systemInstructions = QString(
-            "System Configuration: You are an autonomous local coding agent running inside a Qt C++ wrapper.\n"
-            "CRITICAL: You are sandboxed to the working directory: %1\n"
-            "All file paths you provide MUST be relative to this directory. Do not attempt to access files outside this workspace.\n\n"
-            "GIT INTEGRATION: If you need to execute 'git push' or 'git pull', a GitHub Personal Access Token is available in the environment variable $GITHUB_PAT. "
-            "WEB DEPLOYMENT: You have a native 'upload_ftp' tool. You can use this to deploy HTML/CSS/JS files directly to remote servers.\n\n"
-            "To authenticate silently, format your remote URLs like this: https://$GITHUB_PAT@github.com/Username/Repo.git\n\n"
-            "Acknowledge these instructions, confirm your working directory, and introduce yourself."
-        ).arg(currentWorkspacePath);
+        QString systemInstructions = buildSystemPrompt();
             
         saveInteractionToDb("system", "System Sandbox Initialized: " + currentWorkspacePath);
         apiClient->sendPrompt(systemInstructions);
@@ -516,6 +523,32 @@ void MainWindow::handleNativeFunctionCall(const QString& functionName, const QJs
         handleAgentActionRequest(command);
         return;
     }
+
+    // 7. SILENT ACTION: Fetch Webpage
+    if (functionName == "fetch_webpage") {
+        QString urlStr = arguments["url"].toString();
+        
+        QNetworkAccessManager manager;
+        QNetworkRequest request((QUrl(urlStr)));
+        QNetworkReply* reply = manager.get(request);
+        
+        // Freeze local execution thread until the HTTP request finishes
+        QEventLoop loop;
+        connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+        
+        QString result;
+        if (reply->error() == QNetworkReply::NoError) {
+            result = QString("System [fetch_webpage %1]:\n%2").arg(urlStr, QString::fromUtf8(reply->readAll()));
+        } else {
+            result = QString("System Error [fetch_webpage %1]: %2").arg(urlStr, reply->errorString());
+        }
+        
+        reply->deleteLater();
+        saveInteractionToDb("system", result);
+        apiClient->sendPrompt(result); // Feed the HTML straight back to the LLM
+        return;
+    }
 }
 
 // --- TOOLBAR LOGIC ---
@@ -552,14 +585,7 @@ void MainWindow::switchSession() {
         bool isExistingSession = loadHistoryFromDb();
 
         if (!isExistingSession) {
-            QString systemInstructions = QString(
-                "System Configuration: You are an autonomous local coding agent running inside a Qt C++ wrapper.\n"
-                "CRITICAL: You are sandboxed to the working directory: %1\n"
-                "All file paths you provide MUST be relative to this directory. Do not attempt to access files outside this workspace.\n\n"
-                "GIT INTEGRATION: If you need to execute 'git push' or 'git pull', a GitHub Personal Access Token is available in the environment variable $GITHUB_PAT. "
-                "To authenticate silently, format your remote URLs like this: https://$GITHUB_PAT@github.com/Username/Repo.git\n\n"
-                "Acknowledge these instructions, confirm your working directory, and introduce yourself."
-            ).arg(currentWorkspacePath);
+            QString systemInstructions = buildSystemPrompt();
                 
             saveInteractionToDb("system", "System Sandbox Initialized: " + currentWorkspacePath);
             apiClient->sendPrompt(systemInstructions);

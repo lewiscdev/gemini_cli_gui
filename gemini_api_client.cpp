@@ -148,6 +148,26 @@ QJsonArray GeminiApiClient::defineAvailableTools() const {
     uploadFtpTool["parameters"] = ftpParams;
     toolsArray.append(uploadFtpTool);
 
+    // --- TOOL 6: fetch_webpage ---
+    QJsonObject fwUrl; 
+    fwUrl["type"] = "STRING"; 
+    fwUrl["description"] = "The full HTTP/HTTPS URL of the webpage to fetch (e.g., https://my-test-site.com/index.html).";
+    
+    QJsonObject fwProps; fwProps["url"] = fwUrl;
+    QJsonArray fwReq; fwReq.append("url");
+    
+    QJsonObject fwParams; 
+    fwParams["type"] = "OBJECT"; 
+    fwParams["properties"] = fwProps; 
+    fwParams["required"] = fwReq;
+
+    QJsonObject fetchWebpageTool;
+    fetchWebpageTool["type"] = "function"; 
+    fetchWebpageTool["name"] = "fetch_webpage";
+    fetchWebpageTool["description"] = "Fetches the raw HTML/text content of a live webpage. Useful for verifying deployments.";
+    fetchWebpageTool["parameters"] = fwParams;
+    toolsArray.append(fetchWebpageTool);
+
     return toolsArray;
 }
 
@@ -158,16 +178,22 @@ QByteArray GeminiApiClient::buildJsonPayload(const QString& newPrompt, const QSt
     
     QString finalPrompt = newPrompt;
     
-    // --- NEW: INJECT ATTACHED FILES INTO THE PROMPT ---
+    // --- NEW: FILTERED ATTACHMENT INJECTION ---
+    QStringList allowedExtensions = {"cpp", "h", "c", "hpp", "txt", "cmake", "json", "xml", "js", "html", "css", "md", "sh", "py", "bat"};
+
     for (const QString& filePath : attachments) {
-        QFile file(filePath);
         QFileInfo fileInfo(filePath);
+        QString ext = fileInfo.suffix().toLower();
         
-        // Open the file and read the text
+        // Block images and binaries
+        if (!allowedExtensions.contains(ext)) {
+            finalPrompt += QString("\n\n[System Note: Attached file '%1' was ignored. Binary/Image formats are filtered to save tokens.]\n").arg(fileInfo.fileName());
+            continue;
+        }
+
+        QFile file(filePath);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QString content = file.readAll();
-            
-            // Format it nicely so the LLM knows it's an attached file
             finalPrompt += QString("\n\n=== [ATTACHED FILE: %1] ===\n%2\n=========================\n")
                            .arg(fileInfo.fileName(), content);
             file.close();
@@ -175,7 +201,7 @@ QByteArray GeminiApiClient::buildJsonPayload(const QString& newPrompt, const QSt
             finalPrompt += QString("\n\n[System Note: Failed to read attached file: %1]\n").arg(fileInfo.fileName());
         }
     }
-    // ---------------------------------------------------
+    // ------------------------------------------
     
     payloadObject["input"] = finalPrompt;
     

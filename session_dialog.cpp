@@ -24,6 +24,7 @@ SessionDialog::SessionDialog(QWidget* parent) : QDialog(parent) {
     btnNew = new QPushButton("New Session", this);
     btnDelete = new QPushButton("Delete", this);
     btnLoad = new QPushButton("Load Selected", this);
+    btnLoad->setDefault(true); // Makes the 'Enter' key trigger this button
 
     btnLayout->addWidget(btnNew);
     btnLayout->addWidget(btnDelete);
@@ -64,6 +65,10 @@ void SessionDialog::loadSessionsFromDb() {
         item->setData(Qt::UserRole + 1, name);
         item->setData(Qt::UserRole + 2, workspace);
         sessionList->addItem(item);
+    }
+
+    if (sessionList->count() > 0) {
+        sessionList->setCurrentRow(0); // Auto-select the top item
     }
 }
 
@@ -131,6 +136,13 @@ void SessionDialog::selectAndClose() {
     selectedSession.name = item->data(Qt::UserRole + 1).toString();
     selectedSession.workspace = item->data(Qt::UserRole + 2).toString();
     
+    // Update the timestamp so this session is at the top next time
+    QSqlQuery query;
+    query.prepare("UPDATE sessions SET created_at = :time WHERE id = :id");
+    query.bindValue(":time", QDateTime::currentSecsSinceEpoch());
+    query.bindValue(":id", selectedSession.id);
+    query.exec();
+
     accept();
 }
 

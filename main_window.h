@@ -74,6 +74,7 @@ private:
     QString resolveAndVerifyPath(const QString& relativeTarget);
 
     void updateAttachmentUi();
+    QString buildSystemPrompt();
 };
 
 #endif // MAIN_WINDOW_H
