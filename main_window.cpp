@@ -13,6 +13,7 @@
 #include <QSqlError>
 #include <QDateTime>
 #include <QUuid>
+#include <QDir>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setupUi();
@@ -48,11 +49,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // inject the secured key into the api client
     apiClient->setApiKey(storedKey);
     
-    // inject the system prompt
-    QString systemInstructions = 
-        "System Configuration: You are an autonomous local assistant running inside a GUI wrapper. "
-        "You have the ability to execute local file operations using the provided tools. "
-        "Acknowledge these instructions and introduce yourself.";
+    QString storedWorkspace = settings.value("workspace_dir", QDir::homePath()).toString();
+
+    // Dynamically build the system prompt
+    QString systemInstructions = QString(
+        "System Configuration: You are an autonomous local coding agent running inside a Qt C++ wrapper.\n"
+        "CRITICAL: You are sandboxed to the following working directory: %1\n"
+        "All file paths you provide to your tools MUST be relative to this directory. Do not attempt to access files outside this workspace.\n"
+        "Acknowledge these instructions, confirm your working directory, and introduce yourself."
+    ).arg(storedWorkspace);
         
     apiClient->sendPrompt(systemInstructions);
 }

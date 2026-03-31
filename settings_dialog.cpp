@@ -1,52 +1,69 @@
 #include "settings_dialog.h"
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QSettings>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QDir>
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
-    setupUi();
-    loadExistingSettings();
-    setWindowTitle("Application Settings");
-    resize(400, 150);
-}
+    setWindowTitle("Agent Configuration");
+    setMinimumWidth(400);
 
-void SettingsDialog::setupUi() {
-    QVBoxLayout* layout = new QVBoxLayout(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    QLabel* instructionLabel = new QLabel("Enter your Google Gemini API Key:", this);
-    
+    // API Key UI
+    mainLayout->addWidget(new QLabel("Gemini API Key:"));
     apiKeyInput = new QLineEdit(this);
-    // mask the input for shoulder-surfing security
-    apiKeyInput->setEchoMode(QLineEdit::PasswordEchoOnEdit); 
+    apiKeyInput->setEchoMode(QLineEdit::PasswordEchoOnEdit);
+    mainLayout->addWidget(apiKeyInput);
 
-    saveButton = new QPushButton("Save Configuration", this);
-    connect(saveButton, &QPushButton::clicked, this, &SettingsDialog::saveAndClose);
+    // Workspace UI
+    mainLayout->addWidget(new QLabel("Agent Workspace (Sandbox Directory):"));
+    QHBoxLayout* wsLayout = new QHBoxLayout();
+    workspaceInput = new QLineEdit(this);
+    workspaceInput->setReadOnly(true); // Force user to use the browse button
+    browseButton = new QPushButton("Browse...", this);
+    wsLayout->addWidget(workspaceInput);
+    wsLayout->addWidget(browseButton);
+    mainLayout->addLayout(wsLayout);
 
-    layout->addWidget(instructionLabel);
-    layout->addWidget(apiKeyInput);
-    layout->addWidget(saveButton);
+    // Save Button
+    saveButton = new QPushButton("Save & Launch", this);
+    mainLayout->addWidget(saveButton);
+
+    // Load Existing Settings
+    QSettings settings;
+    apiKeyInput->setText(settings.value("api_key", "").toString());
+    workspaceInput->setText(settings.value("workspace_dir", QDir::homePath()).toString());
+
+    // Connections
+    connect(browseButton, &QPushButton::clicked, this, &SettingsDialog::browseWorkspace);
+    connect(saveButton, &QPushButton::clicked, this, &SettingsDialog::saveSettings);
 }
 
-void SettingsDialog::loadExistingSettings() {
-    // initialize QSettings using the global identity set in main.cpp
-    QSettings settings;
-    // load the key if it exists, otherwise return an empty string
-    QString savedKey = settings.value("api_key", "").toString();
-    
-    if (!savedKey.isEmpty()) {
-        apiKeyInput->setText(savedKey);
+void SettingsDialog::browseWorkspace() {
+    QString dir = QFileDialog::getExistingDirectory(this, "Select Workspace Directory",
+                                                    workspaceInput->text(),
+                                                    QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    if (!dir.isEmpty()) {
+        workspaceInput->setText(dir);
     }
 }
 
-void SettingsDialog::saveAndClose() {
+void SettingsDialog::saveSettings() {
+    if (apiKeyInput->text().trimmed().isEmpty() || workspaceInput->text().trimmed().isEmpty()) {
+        QMessageBox::warning(this, "Error", "Both API Key and Workspace Directory are required.");
+        return;
+    }
+
     QSettings settings;
-    // securely commit the value to the system registry
     settings.setValue("api_key", apiKeyInput->text().trimmed());
+    settings.setValue("workspace_dir", workspaceInput->text().trimmed());
     
-    // close the modal and return QDialog::Accepted to the caller
-    accept(); 
+    accept();
 }
 
-QString SettingsDialog::getApiKey() const {
-    return apiKeyInput->text().trimmed();
-}
+QString SettingsDialog::getApiKey() const { return apiKeyInput->text().trimmed(); }
+QString SettingsDialog::getWorkspaceDirectory() const { return workspaceInput->text().trimmed(); }

@@ -5,25 +5,23 @@
 #include <QLineEdit>
 #include <QPushButton>
 
-// an encapsulated modal for secure credential entry
 class SettingsDialog : public QDialog {
     Q_OBJECT
 
 public:
     explicit SettingsDialog(QWidget* parent = nullptr);
-    
-    // allows the main window to retrieve the entered key
     QString getApiKey() const;
+    QString getWorkspaceDirectory() const; // NEW
 
 private slots:
-    void saveAndClose();
+    void browseWorkspace(); // NEW: Opens folder picker
+    void saveSettings();
 
 private:
     QLineEdit* apiKeyInput;
+    QLineEdit* workspaceInput; // NEW
+    QPushButton* browseButton; // NEW
     QPushButton* saveButton;
-    
-    void setupUi();
-    void loadExistingSettings();
 };
 
 #endif // SETTINGS_DIALOG_H
