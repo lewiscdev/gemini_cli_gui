@@ -1,0 +1,65 @@
+# ----------------------------------------------------------------------
+# Build directories and outputs
+# ----------------------------------------------------------------------
+build/
+out/
+bin/
+
+# ----------------------------------------------------------------------
+# Compiled Object files, Executables, and Libraries
+# ----------------------------------------------------------------------
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# ----------------------------------------------------------------------
+# Qt Specific
+# ----------------------------------------------------------------------
+# Ignore Qt Creator user-specific project files
+*.user
+*.user.*
+
+# ----------------------------------------------------------------------
+# CMake Specific (Fallback if built in-source)
+# ----------------------------------------------------------------------
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# ----------------------------------------------------------------------
+# Application Runtime / Agent Generated Files
+# ----------------------------------------------------------------------
+# Ignore the local SQLite database
+interactions.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignore temporary files created by the agent during testing
+test.txt
+
+# ----------------------------------------------------------------------
+# IDE and OS Specific
+# ----------------------------------------------------------------------
+# VS Code
+.vscode/
+
+# Visual Studio
+.vs/
+*.sln
+*.suo
+
+# CLion / JetBrains
+.idea/
+
+# macOS / Windows fluff
+.DS_Store
+Thumbs.db
