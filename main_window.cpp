@@ -38,6 +38,7 @@
 #include <QScreen>
 #include <QWindow>
 #include <QStandardPaths>
+#include <QProcess>
 
 // Include Windows API for precise window cropping during screenshots
 #ifdef Q_OS_WIN
@@ -605,6 +606,16 @@ void MainWindow::handleNativeFunctionCall(const QString& functionName, const QJs
         handleAgentActionRequest(command);
         return;
     }
+
+    // 8. Execute Code (Destructive, Modal required)
+    if (functionName == "execute_code") {
+        AgentCommand command;
+        command.action = functionName;
+        command.target = arguments["language"].toString();
+        command.payload = arguments["code"].toString();
+        handleAgentActionRequest(command);
+        return;
+    }
 }
 
 // ============================================================================
@@ -783,6 +794,87 @@ void MainWindow::handleAgentActionRequest(const AgentCommand& command) {
                 }
             }
         }
+        // --- route 6: execute_code ---
+        else if (command.action == "execute_code") {
+            QString language = command.target.toLower();
+            QString sourceCode = command.payload;
+            
+            QString tempFileName;
+            QString execCommand;
+            QStringList execArgs;
+
+            // determine environment and set up temporary file names
+            if (language == "python") {
+                tempFileName = "temp_agent_script.py";
+                execCommand = "python"; // assumes python is in the system path
+                execArgs << tempFileName;
+            } else if (language == "javascript" || language == "node") {
+                tempFileName = "temp_agent_script.js";
+                execCommand = "node";   // assumes node is in the system path
+                execArgs << tempFileName;
+            } else if (language == "cpp" || language == "c++") {
+                tempFileName = "temp_agent_script.cpp";
+                execCommand = "g++";    // assumes g++ (mingw/gcc) is in the system path
+                execArgs << tempFileName << "-o" << "temp_agent_exec.exe";
+            } else {
+                emit cleanTextReady("[system error: unsupported language '" + language + "'.]");
+                return;
+            }
+
+            // silently write the raw code to the temporary file
+            QFile file(tempFileName);
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                emit cleanTextReady("[system error: failed to write temporary code file.]");
+                return;
+            }
+            file.write(sourceCode.toUtf8());
+            file.close();
+
+            QProcess process;
+            process.setProcessChannelMode(QProcess::MergedChannels); // merge stdout and stderr
+
+            emit cleanTextReady("[system: executing " + language + " code in sandbox...]");
+
+            // handle execution based on compiled vs interpreted languages
+            if (language == "cpp" || language == "c++") {
+                // step 1: compile the c++ code
+                process.start(execCommand, execArgs);
+                process.waitForFinished(10000); 
+
+                if (process.exitCode() != 0) {
+                    QString compileError = process.readAll();
+                    emit cleanTextReady("[system error: compilation failed]\\n" + compileError);
+                    QFile::remove(tempFileName); // clean up source
+                    return;
+                }
+
+                // step 2: run the compiled executable
+                process.start("temp_agent_exec.exe", QStringList());
+                process.waitForFinished(10000); // 10 second timeout protection
+            } else {
+                // step 1: run the interpreted code directly
+                process.start(execCommand, execArgs);
+                process.waitForFinished(10000); // 10 second timeout protection
+            }
+
+            // capture output and handle timeouts
+            QString output = process.readAll();
+            if (process.error() == QProcess::Timedout) {
+                output = "[system error: execution timed out after 10 seconds. infinite loop detected?]";
+                process.kill();
+            } else if (output.isEmpty()) {
+                output = "[system: execution completed successfully with no console output.]";
+            }
+
+            // pipe the results back to the llm
+            emit cleanTextReady(output);
+
+            // meticulously clean up temporary files to preserve the workspace
+            QFile::remove(tempFileName);
+            if (language == "cpp" || language == "c++") {
+                QFile::remove("temp_agent_exec.exe");
+            }
+        }   
 
         saveInteractionToDb("system", systemFeedbackMsg);
         apiClient->sendPrompt(systemFeedbackMsg);

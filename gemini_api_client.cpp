@@ -231,6 +231,20 @@ QJsonArray GeminiApiClient::defineAvailableTools() const {
     screenshotTool["parameters"] = tsParams;
     toolsArray.append(screenshotTool);
 
+    // --- TOOL 8: execute_code ---
+    QJsonObject ecLang; ecLang["type"] = "STRING"; ecLang["description"] = "The programming language to execute (supported: 'python', 'javascript', 'cpp').";
+    QJsonObject ecCode; ecCode["type"] = "STRING"; ecCode["description"] = "The raw source code to execute.";
+    QJsonObject ecProps; ecProps["language"] = ecLang; ecProps["code"] = ecCode;
+    QJsonArray ecReq; ecReq.append("language"); ecReq.append("code");
+    QJsonObject ecParams; ecParams["type"] = "OBJECT"; ecParams["properties"] = ecProps; ecParams["required"] = ecReq;
+
+    QJsonObject executeCodeTool;
+    executeCodeTool["type"] = "function"; 
+    executeCodeTool["name"] = "execute_code";
+    executeCodeTool["description"] = "Executes raw source code in a secure local sandbox and returns the stdout/stderr output.";
+    executeCodeTool["parameters"] = ecParams;
+    toolsArray.append(executeCodeTool);
+
     return toolsArray;
 }
 
