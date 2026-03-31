@@ -3,6 +3,8 @@
 #include <QJsonDocument>
 #include <QJsonValue>
 #include <QUrl>
+#include <QFile>
+#include <QFileInfo>
 
 GeminiApiClient::GeminiApiClient(QObject* parent) : QObject(parent) {
     networkManager = new QNetworkAccessManager(this);
@@ -29,16 +31,17 @@ void GeminiApiClient::resetSession() {
     currentApiInteractionId.clear();
 }
 
-void GeminiApiClient::sendPrompt(const QString& userInput) {
+void GeminiApiClient::sendPrompt(const QString& userInput, const QStringList& attachments) {
     if (apiKey.isEmpty()) {
         emit networkError("API Key is missing. Please configure it in the settings.");
         return;
     }
 
     QNetworkRequest request = createRequest();
-    QByteArray payload = buildJsonPayload(userInput);
+    
+    // Pass the attachments down to the payload builder
+    QByteArray payload = buildJsonPayload(userInput, attachments);
 
-    // execute the asynchronous POST request
     networkManager->post(request, payload);
 }
 
@@ -148,21 +151,40 @@ QJsonArray GeminiApiClient::defineAvailableTools() const {
     return toolsArray;
 }
 
-QByteArray GeminiApiClient::buildJsonPayload(const QString& newPrompt) {
+QByteArray GeminiApiClient::buildJsonPayload(const QString& newPrompt, const QStringList& attachments) {
     QJsonObject payloadObject;
     
-    // specify the required model
     payloadObject["model"] = "gemini-2.5-flash"; 
-    payloadObject["input"] = newPrompt;
     
-    // handle the stateful connection logic (Replaces chatHistory array)
+    QString finalPrompt = newPrompt;
+    
+    // --- NEW: INJECT ATTACHED FILES INTO THE PROMPT ---
+    for (const QString& filePath : attachments) {
+        QFile file(filePath);
+        QFileInfo fileInfo(filePath);
+        
+        // Open the file and read the text
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString content = file.readAll();
+            
+            // Format it nicely so the LLM knows it's an attached file
+            finalPrompt += QString("\n\n=== [ATTACHED FILE: %1] ===\n%2\n=========================\n")
+                           .arg(fileInfo.fileName(), content);
+            file.close();
+        } else {
+            finalPrompt += QString("\n\n[System Note: Failed to read attached file: %1]\n").arg(fileInfo.fileName());
+        }
+    }
+    // ---------------------------------------------------
+    
+    payloadObject["input"] = finalPrompt;
+    
     if (currentApiInteractionId.isEmpty()) {
         payloadObject["store"] = true;
     } else {
         payloadObject["previous_interaction_id"] = currentApiInteractionId;
     }
     
-    // attach our defined tools to every request
     payloadObject["tools"] = defineAvailableTools();
     
     return QJsonDocument(payloadObject).toJson(QJsonDocument::Compact);

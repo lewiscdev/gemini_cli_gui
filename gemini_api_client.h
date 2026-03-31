@@ -19,7 +19,7 @@ public:
     void setApiKey(const QString& key);
     
     // primary execution method
-    void sendPrompt(const QString& userInput);
+    void sendPrompt(const QString& userInput, const QStringList& attachments = QStringList());
 
     // resets the interaction chain for a new chat
     void resetSession();
@@ -51,7 +51,7 @@ private:
     QNetworkRequest createRequest() const;
     
     // helper to assemble the json body
-    QByteArray buildJsonPayload(const QString& newPrompt);
+    QByteArray buildJsonPayload(const QString& newPrompt, const QStringList& attachments);
 
     // helper to define the available tools in the system prompt
     QJsonArray defineAvailableTools() const;

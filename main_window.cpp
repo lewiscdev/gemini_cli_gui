@@ -294,6 +294,7 @@ void MainWindow::updateTokenDisplay(int inputTokens, int outputTokens, int total
 void MainWindow::handleSendClicked() {
     QString userInput = inputField->text();
     
+    // Allow sending if there is text OR if there are just files attached
     if (!userInput.isEmpty() || !pendingAttachments.isEmpty()) {
         
         QString displayMsg = userInput;
@@ -304,9 +305,8 @@ void MainWindow::handleSendClicked() {
         chatDisplay->append("<b>You:</b> " + displayMsg);
         saveInteractionToDb("user", displayMsg);
         
-        // --- WE WILL UPDATE THE API CLIENT NEXT TO ACCEPT THIS LIST ---
-        // apiClient->sendPrompt(userInput, pendingAttachments); 
-        apiClient->sendPrompt(userInput); // (Temporary until API is updated)
+        // Pass the attachments directly to the API client!
+        apiClient->sendPrompt(userInput, pendingAttachments); 
         
         inputField->clear();
         clearAttachments(); // Wipe the pending list after sending
