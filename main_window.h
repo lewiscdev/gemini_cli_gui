@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QSqlDatabase>
 #include "agent_manager.h" 
+#include <QLabel>
 
 // forward declarations
 class QVBoxLayout;
@@ -12,6 +13,7 @@ class QLineEdit;
 class QPushButton;
 class QWidget;
 class GeminiApiClient; 
+class QLabel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -26,6 +28,7 @@ private slots:
     void appendStandardError(const QString& text);
     void handleAgentActionRequest(const AgentCommand& command);
     void handleNativeFunctionCall(const QString& functionName, const QJsonObject& arguments);
+    void updateTokenDisplay(int inputTokens, int outputTokens, int totalTokens);
 
 private:
     QWidget* centralWidget;
@@ -33,6 +36,7 @@ private:
     QTextEdit* chatDisplay;
     QLineEdit* inputField;
     QPushButton* sendButton;
+    QLabel* tokenDisplayLabel;
 
     GeminiApiClient* apiClient; 
     AgentActionManager* agentController;

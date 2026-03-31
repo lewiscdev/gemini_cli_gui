@@ -134,6 +134,15 @@ void GeminiApiClient::onNetworkReply(QNetworkReply* reply) {
         currentApiInteractionId = rootObj["id"].toString();
     }
     
+    if (rootObj.contains("usage")) {
+        QJsonObject usageObj = rootObj["usage"].toObject();
+        int inputTokens = usageObj["total_input_tokens"].toInt();
+        int outputTokens = usageObj["total_output_tokens"].toInt();
+        int totalTokens = usageObj["total_tokens"].toInt();
+        
+        emit usageMetricsReceived(inputTokens, outputTokens, totalTokens);
+    }
+
     if (rootObj.contains("outputs")) {
         QJsonArray outputsArray = rootObj["outputs"].toArray();
         QString combinedText = "";

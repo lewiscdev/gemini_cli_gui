@@ -115,8 +115,13 @@ void MainWindow::setupUi() {
 
     sendButton = new QPushButton("send", this);
 
+    tokenDisplayLabel = new QLabel("Context Load: 0 tokens | Last Output: 0 tokens", this);
+    tokenDisplayLabel->setAlignment(Qt::AlignRight);
+    tokenDisplayLabel->setStyleSheet("color: #888888; font-size: 11px;");
+
     // assemble the layout structure
     mainLayout->addWidget(chatDisplay);
+    mainLayout->addWidget(tokenDisplayLabel);
     mainLayout->addWidget(inputField);
     mainLayout->addWidget(sendButton);
 
@@ -135,6 +140,8 @@ void MainWindow::initializeConnections() {
     
     // native function calls are routed to a new handler
     connect(apiClient, &GeminiApiClient::functionCallRequested, this, &MainWindow::handleNativeFunctionCall);
+
+    connect(apiClient, &GeminiApiClient::usageMetricsReceived, this, &MainWindow::updateTokenDisplay);
 }
 
 void MainWindow::handleSendClicked() {
@@ -209,4 +216,23 @@ void MainWindow::handleNativeFunctionCall(const QString& functionName, const QJs
 
     // reuse our existing security intercept modal
     handleAgentActionRequest(command);
+}
+
+void MainWindow::updateTokenDisplay(int inputTokens, int outputTokens, int totalTokens) {
+    // Format the display string
+    QString displayText = QString("Session Context Load: %1 | Last Reply Cost: %2 | Turn Total: %3")
+                          .arg(inputTokens).arg(outputTokens).arg(totalTokens);
+                          
+    tokenDisplayLabel->setText(displayText);
+    
+    // Context Window Warning Logic (Assuming 1M token limit for Gemini 1.5/2.5 Flash)
+    if (inputTokens > 950000) {
+        tokenDisplayLabel->setStyleSheet("color: red; font-size: 11px; font-weight: bold;");
+        chatDisplay->append("<span style=\"color: orange;\"><b>[System Warning]:</b> Approaching maximum 1M token context window! The API will reject further requests soon. Please start a new session.</span>");
+    } else if (inputTokens > 800000) {
+        tokenDisplayLabel->setStyleSheet("color: orange; font-size: 11px;");
+    } else {
+        // Reset to default gray if within safe limits
+        tokenDisplayLabel->setStyleSheet("color: #888888; font-size: 11px;");
+    }
 }

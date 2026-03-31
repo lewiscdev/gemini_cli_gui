@@ -34,6 +34,8 @@ signals:
     // emitted when the response contains a function call request
     void functionCallRequested(const QString& functionName, const QJsonObject& arguments);
 
+    void usageMetricsReceived(int inputTokens, int outputTokens, int totalTokens);
+
 private slots:
     // internal handler for when the google server responds
     void onNetworkReply(QNetworkReply* reply);
