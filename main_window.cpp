@@ -18,6 +18,7 @@
 #include <QFileInfo>
 #include <QLabel>
 #include <QStringList>
+#include <QProcess>
 
 // --- THE SANDBOX HELPER ---
 // This safely resolves relative paths to absolute paths, ensuring the LLM 
@@ -211,11 +212,46 @@ void MainWindow::handleAgentActionRequest(const AgentCommand& command) {
 
     if (msgBox.exec() == QMessageBox::Yes) {
         chatDisplay->append(QString("<span style=\"color: green;\">[System: Executed %1 on %2]</span>").arg(command.action, command.target));
-        agentController->executeApprovedAction(command);
         
-        QString successMsg = "System: Action approved. File written successfully.";
-        saveInteractionToDb("system", successMsg);
-        apiClient->sendPrompt(successMsg);
+        QString systemFeedbackMsg;
+
+        // Route 1: Standard File Writing
+        if (command.action == "write_file") {
+            agentController->executeApprovedAction(command);
+            systemFeedbackMsg = "System: Action approved. File written successfully.";
+        } 
+        // Route 2: Shell/Terminal Execution
+        else if (command.action == "execute_shell_command") {
+            QSettings settings;
+            QString workspacePath = settings.value("workspace_dir", QDir::homePath()).toString();
+
+            QProcess process;
+            process.setWorkingDirectory(workspacePath); // Lock execution to the sandbox
+
+            // Cross-platform shell wrapper
+            #ifdef Q_OS_WIN
+                process.start("cmd.exe", QStringList() << "/c" << command.target);
+            #else
+                process.start("/bin/sh", QStringList() << "-c" << command.target);
+            #endif
+
+            // Wait up to 15 seconds for the command to finish compiling/running
+            process.waitForFinished(15000); 
+
+            // Capture the raw terminal output
+            QByteArray stdOut = process.readAllStandardOutput();
+            QByteArray stdErr = process.readAllStandardError();
+
+            // Format the feedback exactly like a terminal window for the LLM
+            systemFeedbackMsg = QString("System [execute_shell_command]:\nExit Code: %1\nSTDOUT:\n%2\nSTDERR:\n%3")
+                                 .arg(process.exitCode())
+                                 .arg(QString::fromLocal8Bit(stdOut).trimmed())
+                                 .arg(QString::fromLocal8Bit(stdErr).trimmed());
+        }
+
+        // Save and send the resulting terminal output back to the LLM
+        saveInteractionToDb("system", systemFeedbackMsg);
+        apiClient->sendPrompt(systemFeedbackMsg);
     } else {
         chatDisplay->append("<span style=\"color: red;\">[System: Action denied by user.]</span>");
         
@@ -277,5 +313,17 @@ void MainWindow::handleNativeFunctionCall(const QString& functionName, const QJs
         command.payload = arguments["payload"].toString();
 
         handleAgentActionRequest(command);
+    }
+
+    // 5. DESTRUCTIVE ACTION: Execute Shell Command (Must go through the UI Modal)
+    if (functionName == "execute_shell_command") {
+        AgentCommand command;
+        command.action = functionName;
+        // We store the shell command in the 'target' variable so the UI modal can display it
+        command.target = arguments["command"].toString(); 
+        command.payload = "";
+
+        handleAgentActionRequest(command);
+        return;
     }
 }

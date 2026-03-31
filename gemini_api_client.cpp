@@ -90,6 +90,29 @@ QJsonArray GeminiApiClient::defineAvailableTools() const {
     listDirTool["parameters"] = ldParams;
     toolsArray.append(listDirTool);
 
+    // --- TOOL 4: execute_shell_command ---
+    QJsonObject escCommand; 
+    escCommand["type"] = "STRING"; 
+    escCommand["description"] = "The terminal/shell command to execute (e.g., 'git status', 'cmake --build .', 'npm run test').";
+    
+    QJsonObject escProps; 
+    escProps["command"] = escCommand;
+    
+    QJsonArray escReq; 
+    escReq.append("command");
+    
+    QJsonObject escParams; 
+    escParams["type"] = "OBJECT"; 
+    escParams["properties"] = escProps; 
+    escParams["required"] = escReq;
+
+    QJsonObject executeShellTool;
+    executeShellTool["type"] = "function"; // Flattened schema discriminator!
+    executeShellTool["name"] = "execute_shell_command";
+    executeShellTool["description"] = "Executes a shell/terminal command in the workspace and returns the console output (stdout/stderr).";
+    executeShellTool["parameters"] = escParams;
+    toolsArray.append(executeShellTool);
+
     return toolsArray;
 }
 
