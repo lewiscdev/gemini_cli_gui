@@ -49,6 +49,7 @@ private:
     
     // local storage setup and execution
     void initDatabase();
+    void loadHistoryFromDb();
     void saveInteractionToDb(const QString& role, const QString& content, const QString& apiInteractionId = "");
 };
 

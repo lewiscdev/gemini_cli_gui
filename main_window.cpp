@@ -48,6 +48,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     
     initializeConnections();
 
+    loadHistoryFromDb();
+
     // Check settings for API Key AND Workspace Directory
     QSettings settings;
     QString storedKey = settings.value("api_key", "").toString();
@@ -103,6 +105,39 @@ void MainWindow::initDatabase() {
                "role TEXT, "
                "content TEXT, "
                "timestamp INTEGER)");
+}
+
+void MainWindow::loadHistoryFromDb() {
+    if (!db.isOpen()) return;
+
+    // Fetch all interactions in chronological order
+    QSqlQuery query("SELECT role, content, api_interaction_id FROM interactions ORDER BY timestamp ASC");
+    QString lastInteractionId;
+
+    while (query.next()) {
+        QString role = query.value(0).toString();
+        QString content = query.value(1).toString();
+        QString apiId = query.value(2).toString();
+
+        // Keep track of the most recent Google Interaction ID
+        if (!apiId.isEmpty()) {
+            lastInteractionId = apiId;
+        }
+
+        // Repopulate the UI exactly how the user left it
+        if (role == "user") {
+            chatDisplay->append("<b>You:</b> " + content);
+        } else if (role == "model") {
+            chatDisplay->append("<b>Agent:</b> " + content);
+        } else if (role == "system") {
+            chatDisplay->append("<span style=\"color: gray;\">" + content + "</span>");
+        }
+    }
+
+    // CRITICAL: Hand the state back to the Gemini Client!
+    if (!lastInteractionId.isEmpty()) {
+        apiClient->restoreSession(lastInteractionId);
+    }
 }
 
 void MainWindow::saveInteractionToDb(const QString& role, const QString& content, const QString& apiInteractionId) {

@@ -24,6 +24,8 @@ public:
     // resets the interaction chain for a new chat
     void resetSession();
 
+    void restoreSession(const QString& interactionId);
+
 signals:
     // emitted when a successful json payload is parsed, passing the new interaction id
     void responseReceived(const QString& responseText, const QString& interactionId);

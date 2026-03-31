@@ -19,6 +19,11 @@ void GeminiApiClient::setApiKey(const QString& key) {
     apiKey = key;
 }
 
+void GeminiApiClient::restoreSession(const QString& interactionId) {
+    // Injects the saved state from SQLite back into the networking client
+    currentApiInteractionId = interactionId;
+}
+
 void GeminiApiClient::resetSession() {
     // clears the current interaction to start a fresh thread
     currentApiInteractionId.clear();
