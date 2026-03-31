@@ -37,6 +37,7 @@
 #include <QGuiApplication>
 #include <QScreen>
 #include <QWindow>
+#include <QStandardPaths>
 
 // Include Windows API for precise window cropping during screenshots
 #ifdef Q_OS_WIN
@@ -266,11 +267,24 @@ void MainWindow::initializeConnections() {
  * @brief Initializes the SQLite database and schemas.
  */
 void MainWindow::initDatabase() {
-    db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName("agent_history.db");
+    // --- CRITICAL FIX: Persistent AppData Path ---
+    // Forces the database into a permanent OS folder (e.g., AppData/Roaming on Windows)
+    // so it doesn't get wiped when CMake cleans the local build directory.
+    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(dataDir); 
+    QString dbPath = QDir(dataDir).absoluteFilePath("agent_history.db");
+
+    // Safely check if the connection exists to prevent warnings on hot-reloads
+    if (QSqlDatabase::contains(QSqlDatabase::defaultConnection)) {
+        db = QSqlDatabase::database(QSqlDatabase::defaultConnection);
+    } else {
+        db = QSqlDatabase::addDatabase("QSQLITE");
+    }
+
+    db.setDatabaseName(dbPath);
 
     if (!db.open()) {
-        QMessageBox::critical(this, "Database Error", "Could not open local database.");
+        QMessageBox::critical(this, "Database Error", "Could not open local database at:\n" + dbPath);
         return;
     }
 

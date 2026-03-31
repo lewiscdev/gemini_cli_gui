@@ -13,6 +13,11 @@ int main(int argc, char *argv[]) {
     // Initialize the Qt application object required for GUI and event handling
     QApplication app(argc, argv);
     
+    // Persistent OS registry setup
+    QApplication::setOrganizationName("GeminiNativeAgent");
+    QApplication::setOrganizationDomain("gemininativeagent.local");
+    QApplication::setApplicationName("GeminiNativeAgent");
+
     // Create and display the primary application window
     MainWindow mainWindow;
     mainWindow.show();
