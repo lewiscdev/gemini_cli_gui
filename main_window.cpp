@@ -214,12 +214,21 @@ bool MainWindow::loadHistoryFromDb() {
         cursor.movePosition(QTextCursor::End);
         chatDisplay->setTextCursor(cursor);
 
+        // Native Qt Block Alignment
+        QTextBlockFormat blockFormat;
+
         if (data.role == "user") {
-            chatDisplay->insertHtml("<div align=\"right\"><b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(data.content) + "</div><br>");
+            blockFormat.setAlignment(Qt::AlignRight);
+            cursor.insertBlock(blockFormat); // Push the block right
+            chatDisplay->insertHtml("<b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(data.content) + "<br>");
         } else if (data.role == "model") {
+            blockFormat.setAlignment(Qt::AlignLeft);
+            cursor.insertBlock(blockFormat); // Reset the block left
             chatDisplay->insertHtml("<b>Agent:</b><br>" + ChatFormatter::formatMarkdownToHtml(data.content) + "<br>");
         } else if (data.role == "system") {
-            chatDisplay->insertHtml("<span style=\"color: gray;\">" + data.content + "</span><br><br>");
+            blockFormat.setAlignment(Qt::AlignLeft);
+            cursor.insertBlock(blockFormat); // Reset the block left
+            chatDisplay->insertHtml("<span style=\"color: gray;\">" + data.content + "</span><br>");
         }
     }
 
@@ -296,9 +305,12 @@ void MainWindow::handleSendClicked() {
         QTextCursor cursor = chatDisplay->textCursor();
         cursor.movePosition(QTextCursor::End);
         chatDisplay->setTextCursor(cursor);
+
+        QTextBlockFormat blockFormat;
+        blockFormat.setAlignment(Qt::AlignRight);
+        cursor.insertBlock(blockFormat);
         
-        // WRAP THE USER INPUT IN A RIGHT-ALIGNED DIV!
-        chatDisplay->insertHtml("<div align=\"right\"><b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(displayMsg) + "</div><br>");
+        chatDisplay->insertHtml("<b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(displayMsg) + "<br>");
         chatDisplay->ensureCursorVisible();
         
         saveInteractionToDb("user", displayMsg);
@@ -364,6 +376,10 @@ void MainWindow::onResponseReceived(const QString& responseText, const QString& 
     cursor.movePosition(QTextCursor::End);
     chatDisplay->setTextCursor(cursor);
     
+    QTextBlockFormat blockFormat;
+    blockFormat.setAlignment(Qt::AlignLeft);
+    cursor.insertBlock(blockFormat);
+
     chatDisplay->insertHtml("<b>Agent:</b><br>" + ChatFormatter::formatMarkdownToHtml(responseText) + "<br>");
     chatDisplay->ensureCursorVisible();
 
