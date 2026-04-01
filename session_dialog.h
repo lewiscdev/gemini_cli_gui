@@ -2,9 +2,9 @@
  * @file session_dialog.h
  * @brief Dialog window for managing local projects and chat sessions.
  *
- * This file defines the SessionDialog class and SessionData struct, 
- * which handle the creation, deletion, and selection of isolated 
- * agent workspaces and their associated SQLite chat histories.
+ * This file defines the SessionDialog class, which handles the UI for 
+ * creating, deleting, and selecting isolated agent workspaces. It now 
+ * delegates all SQLite operations to the injected DatabaseManager.
  */
 
 #ifndef SESSION_DIALOG_H
@@ -13,39 +13,34 @@
 #include <QDialog>
 #include <QString>
 
-// Forward declarations to optimize compile times and reduce header bloat
+#include "database_manager.h"
+
+// forward declarations to optimize compile times
 class QListWidget;
 class QPushButton;
-
-/**
- * @brief A lightweight data structure representing a saved agent session.
- */
-struct SessionData {
-    QString id;         ///< Unique UUID linking the session to the SQLite database
-    QString name;       ///< Human-readable project/session name
-    QString workspace;  ///< Absolute path to the isolated local sandbox directory
-};
 
 class SessionDialog : public QDialog {
     Q_OBJECT
 
 public:
     /**
-     * @brief Constructs the Session Dialog and loads existing sessions from the database.
-     * @param parent The parent widget, typically the MainWindow.
+     * @brief Constructs the session dialog using an injected database manager.
+     * @param db Pointer to the active database manager instance.
+     * @param parent The parent widget, typically the main window.
      */
-    explicit SessionDialog(QWidget* parent = nullptr);
+    explicit SessionDialog(DatabaseManager* db, QWidget* parent = nullptr);
 
     /**
      * @brief Retrieves the data for the session the user just selected.
-     * @return A SessionData struct containing the ID, name, and workspace path.
+     * @return A session data struct containing the id, name, and workspace path.
      */
-    SessionData getSelectedSession() const;
+    [[nodiscard]] SessionData getSelectedSession() const;
 
 private slots:
-    // --- UI Interaction & Database Slots ---
+    // --- ui interaction slots ---
+    
     /**
-     * @brief Queries the SQLite database and populates the list widget.
+     * @brief Queries the database manager and populates the list widget.
      */
     void loadSessionsFromDb();
     
@@ -65,19 +60,16 @@ private slots:
     void selectAndClose();
 
 private:
-    /**
-     * @brief Internal helper to ensure the SQLite 'sessions' table exists before querying.
-     */
-    void ensureTableExists(); 
-
-    // --- UI Pointers ---
-    QListWidget* sessionList;
-    QPushButton* btnNew;
-    QPushButton* btnDelete;
-    QPushButton* btnLoad;
+    DatabaseManager* dbManager;  ///< pointer to the centralized database manager
     
-    // --- Internal State ---
-    SessionData selectedSession;
+    // --- ui pointers ---
+    QListWidget* sessionList{nullptr};
+    QPushButton* btnNew{nullptr};
+    QPushButton* btnDelete{nullptr};
+    QPushButton* btnLoad{nullptr};
+    
+    // --- internal state ---
+    SessionData selectedSession; ///< holds the data of the currently active session
 };
 
 #endif // SESSION_DIALOG_H

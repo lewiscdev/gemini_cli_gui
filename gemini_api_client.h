@@ -1,72 +1,94 @@
 /**
  * @file gemini_api_client.h
- * @brief Network client for communicating with the Google Gemini API.
+ * @brief Google Gemini API network client.
  *
- * This class manages the stateful interaction with the Gemini v1beta API,
- * including JSON payload construction, multi-modal file attachments, 
- * tool definitions, and parsing Google's asynchronous responses.
+ * This class handles asynchronous HTTPS communication with the Gemini API.
+ * It leverages external helper classes to construct payloads and focuses 
+ * entirely on request transmission, state tracking, and response parsing.
  */
 
 #ifndef GEMINI_API_CLIENT_H
 #define GEMINI_API_CLIENT_H
 
 #include <QObject>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QJsonArray>
-#include <QJsonObject>
 #include <QString>
 #include <QStringList>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QJsonObject>
 
 class GeminiApiClient : public QObject {
     Q_OBJECT
 
 public:
-    explicit GeminiApiClient(QObject* parent = nullptr);
-    ~GeminiApiClient();
-
-    // --- Configuration ---
-    void setApiKey(const QString& key);
-    
-    // --- Core Execution ---
     /**
-     * @brief Sends a prompt and optional file attachments to the Gemini API.
+     * @brief Constructs the API client and initializes the network manager.
+     * @param parent The parent QObject.
      */
-    void sendPrompt(const QString& userInput, const QStringList& attachments = QStringList());
-
-    // --- Session Management ---
+    explicit GeminiApiClient(QObject* parent = nullptr);
+    
     /**
-     * @brief Clears the current interaction ID to start a fresh thread.
+     * @brief Ensures safe cleanup of network resources.
+     */
+    ~GeminiApiClient() override;
+
+    /**
+     * @brief Sets the global API key for authentication.
+     * @param key The Gemini API key string.
+     */
+    void setApiKey(const QString& key);
+
+    /**
+     * @brief Restores the server-side contextual memory state.
+     * @param interactionId The stateful tracking ID from a previous database session.
+     */
+    void restoreSession(const QString& interactionId);
+
+    /**
+     * @brief Severs the current contextual thread, starting a fresh conversation.
      */
     void resetSession();
 
     /**
-     * @brief Restores the interaction ID from SQLite to resume a previous chat.
+     * @brief Transmits a multi-modal prompt to the Gemini API.
+     * @param text The user's input or system instruction.
+     * @param attachments A list of local file paths to encode and include.
      */
-    void restoreSession(const QString& interactionId);
+    void sendPrompt(const QString& text, const QStringList& attachments = QStringList());
 
 signals:
-    // --- API Response Signals ---
+    /**
+     * @brief Emitted when the agent successfully responds with standard text.
+     */
     void responseReceived(const QString& responseText, const QString& interactionId);
+
+    /**
+     * @brief Emitted when an HTTP, network, or authentication error occurs.
+     */
     void networkError(const QString& errorDetails);
-    void functionCallRequested(const QString& functionName, const QJsonObject& arguments);
+
+    /**
+     * @brief Emitted to update the UI with real-time token consumption.
+     */
     void usageMetricsReceived(int inputTokens, int outputTokens, int totalTokens);
 
+    /**
+     * @brief Emitted when the LLM natively requests to execute a local tool.
+     */
+    void functionCallRequested(const QString& functionName, const QJsonObject& arguments);
+
 private slots:
-    // --- Internal Network Handlers ---
+    /**
+     * @brief Parses the asynchronous HTTP response from Google's servers.
+     * @param reply The completed network reply object.
+     */
     void onNetworkReply(QNetworkReply* reply);
 
 private:
-    QNetworkAccessManager* networkManager;
-    QString apiKey;
+    QNetworkAccessManager* networkManager{nullptr}; ///< handles all asynchronous http traffic
     
-    /// Tracks the stateful API thread to maintain chat history on Google's servers
-    QString currentApiInteractionId; 
-    
-    // --- Payload Construction Helpers ---
-    QNetworkRequest createRequest() const;
-    QByteArray buildJsonPayload(const QString& newPrompt, const QStringList& attachments);
-    QJsonArray defineAvailableTools() const;
+    QString apiKey;                  ///< the authenticated gemini api key
+    QString currentApiInteractionId; ///< tracks the stateful thread on google's servers
 };
 
 #endif // GEMINI_API_CLIENT_H

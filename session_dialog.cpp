@@ -3,46 +3,40 @@
  * @brief Implementation of the local project and session manager.
  *
  * This file handles the UI for creating, loading, and deleting isolated 
- * workspaces. It manages the SQLite 'sessions' table and ensures 
- * seamless project hot-swapping.
+ * workspaces. It delegates all sqlite data persistence and retrieval 
+ * to the injected database manager.
  */
 
 #include "session_dialog.h"
 
-#include <QDateTime>
 #include <QFileDialog>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QSqlError>
-#include <QSqlQuery>
 #include <QUuid>
 #include <QVBoxLayout>
 
-/**
- * @brief Constructs the Session Dialog, initializes the UI, and loads history.
- */
-SessionDialog::SessionDialog(QWidget* parent) : QDialog(parent) {
+SessionDialog::SessionDialog(DatabaseManager* db, QWidget* parent) 
+    : QDialog(parent), dbManager(db) {
+    
     setWindowTitle("Project & Session Manager");
     setMinimumSize(400, 300);
 
-    ensureTableExists();
-
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    // --- Session List View ---
+    // --- session list view ---
     sessionList = new QListWidget(this);
     mainLayout->addWidget(sessionList);
 
-    // --- Control Buttons ---
+    // --- control buttons ---
     QHBoxLayout* btnLayout = new QHBoxLayout();
     btnNew = new QPushButton("New Session", this);
     btnDelete = new QPushButton("Delete", this);
     btnLoad = new QPushButton("Load Selected", this);
 
-    // Allow the user to hit 'Enter' to quickly load the highlighted session
+    // allow the user to hit 'enter' to quickly load the highlighted session
     btnLoad->setDefault(true); 
 
     btnLayout->addWidget(btnNew);
@@ -52,7 +46,7 @@ SessionDialog::SessionDialog(QWidget* parent) : QDialog(parent) {
 
     mainLayout->addLayout(btnLayout);
 
-    // --- Connections ---
+    // --- connections ---
     connect(btnNew, &QPushButton::clicked, this, &SessionDialog::createNewSession);
     connect(btnDelete, &QPushButton::clicked, this, &SessionDialog::deleteSelectedSession);
     connect(btnLoad, &QPushButton::clicked, this, &SessionDialog::selectAndClose);
@@ -61,80 +55,49 @@ SessionDialog::SessionDialog(QWidget* parent) : QDialog(parent) {
     loadSessionsFromDb();
 }
 
-/**
- * @brief Ensures the necessary SQLite table exists before querying.
- */
-void SessionDialog::ensureTableExists() {
-    QSqlQuery query;
-    query.exec("CREATE TABLE IF NOT EXISTS sessions ("
-               "id TEXT PRIMARY KEY, "
-               "name TEXT, "
-               "workspace TEXT, "
-               "created_at INTEGER)");
-}
-
-/**
- * @brief Retrieves all sessions from the database, sorted by most recently used.
- */
 void SessionDialog::loadSessionsFromDb() {
     sessionList->clear();
-    QSqlQuery query("SELECT id, name, workspace FROM sessions ORDER BY created_at DESC");
     
-    while (query.next()) {
-        QString id = query.value(0).toString();
-        QString name = query.value(1).toString();
-        QString workspace = query.value(2).toString();
+    // fetch all sessions through the injected database manager
+    QList<SessionData> sessions = dbManager->getAllSessions();
+    
+    for (const SessionData& data : sessions) {
+        QListWidgetItem* item = new QListWidgetItem(QString("%1\n(%2)").arg(data.name, data.workspace));
         
-        QListWidgetItem* item = new QListWidgetItem(QString("%1\n(%2)").arg(name, workspace));
-        
-        // Store the hidden data payload inside the UI item
-        item->setData(Qt::UserRole, id);
-        item->setData(Qt::UserRole + 1, name);
-        item->setData(Qt::UserRole + 2, workspace);
+        // store the hidden data payload inside the ui item
+        item->setData(Qt::UserRole, data.id);
+        item->setData(Qt::UserRole + 1, data.name);
+        item->setData(Qt::UserRole + 2, data.workspace);
         
         sessionList->addItem(item);
     }
 
-    // Auto-select the most recently used session for lightning-fast startups
+    // auto-select the most recently used session for lightning-fast startups
     if (sessionList->count() > 0) {
         sessionList->setCurrentRow(0); 
     }
 }
 
-/**
- * @brief Prompts the user to create a new session and local workspace mapping.
- */
 void SessionDialog::createNewSession() {
-    // 1. Ask for a project name
+    // ask for a project name
     bool ok;
     QString name = QInputDialog::getText(this, "New Session", "Enter project/session name:", QLineEdit::Normal, "", &ok);
     if (!ok || name.trimmed().isEmpty()) return;
 
-    // 2. Ask for the workspace directory to sandbox the agent
+    // ask for the workspace directory to sandbox the agent
     QString workspace = QFileDialog::getExistingDirectory(this, "Select Workspace Directory for this Session");
     if (workspace.isEmpty()) return;
 
-    // 3. Generate a unique ID and save to database
+    // generate a unique id and save via the database manager
     QString newId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     
-    QSqlQuery query;
-    query.prepare("INSERT INTO sessions (id, name, workspace, created_at) VALUES (:id, :name, :ws, :time)");
-    query.bindValue(":id", newId);
-    query.bindValue(":name", name);
-    query.bindValue(":ws", workspace);
-    query.bindValue(":time", QDateTime::currentSecsSinceEpoch());
-    
-    if (query.exec()) {
+    if (dbManager->createSession(newId, name, workspace)) {
         loadSessionsFromDb(); 
     } else {
-        QMessageBox::critical(this, "Database Error", "Failed to create session: " + query.lastError().text());
+        QMessageBox::critical(this, "Database Error", "Failed to create session in the database.");
     }
 }
 
-/**
- * @brief Deletes a session and wipes its conversational memory from the database.
- * @note This does NOT delete the actual local files in the workspace.
- */
 void SessionDialog::deleteSelectedSession() {
     QListWidgetItem* item = sessionList->currentItem();
     if (!item) return;
@@ -146,25 +109,15 @@ void SessionDialog::deleteSelectedSession() {
                                    QMessageBox::Yes | QMessageBox::No);
                                    
     if (ret == QMessageBox::Yes) {
-        QSqlQuery query;
-        
-        // Delete the master session record
-        query.prepare("DELETE FROM sessions WHERE id = :id");
-        query.bindValue(":id", sessionId);
-        query.exec();
-        
-        // Wipe the associated chat history so it doesn't leave orphaned data
-        query.prepare("DELETE FROM interactions WHERE session_id = :id");
-        query.bindValue(":id", sessionId);
-        query.exec();
-
-        loadSessionsFromDb();
+        // delegate the cascading delete to the database manager
+        if (dbManager->deleteSession(sessionId)) {
+            loadSessionsFromDb();
+        } else {
+            QMessageBox::critical(this, "Database Error", "Failed to delete session from the database.");
+        }
     }
 }
 
-/**
- * @brief Validates selection, updates the 'last used' timestamp, and accepts the dialog.
- */
 void SessionDialog::selectAndClose() {
     QListWidgetItem* item = sessionList->currentItem();
     if (!item) {
@@ -176,19 +129,12 @@ void SessionDialog::selectAndClose() {
     selectedSession.name = item->data(Qt::UserRole + 1).toString();
     selectedSession.workspace = item->data(Qt::UserRole + 2).toString();
     
-    // Update the timestamp so this project bubbles to the top of the list next time!
-    QSqlQuery query;
-    query.prepare("UPDATE sessions SET created_at = :time WHERE id = :id");
-    query.bindValue(":time", QDateTime::currentSecsSinceEpoch());
-    query.bindValue(":id", selectedSession.id);
-    query.exec();
+    // update the timestamp so this project bubbles to the top of the list next time
+    dbManager->updateSessionTimestamp(selectedSession.id);
     
     accept();
 }
 
-/**
- * @brief Returns the payload for the application to instantiate the workspace.
- */
 SessionData SessionDialog::getSelectedSession() const {
     return selectedSession;
 }

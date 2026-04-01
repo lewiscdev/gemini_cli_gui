@@ -2,9 +2,9 @@
  * @file agent_manager.h
  * @brief Manages the execution of local machine actions requested by the agent.
  *
- * Defines the AgentCommand structure and the AgentActionManager class,
- * which enforces security whitelists and executes approved local tasks
- * such as writing files to the disk.
+ * Utilizes the Command Pattern to route agent requests to isolated tool classes.
+ * Maintains a registry of available capabilities, parses json arguments, 
+ * enforces security whitelists, and manages human-in-the-loop approvals.
  */
 
 #ifndef AGENT_MANAGER_H
@@ -13,15 +13,10 @@
 #include <QObject>
 #include <QString>
 #include <QSet>
+#include <QMap>
+#include <QJsonObject>
 
-/**
- * @brief Data structure representing a tool execution request from the LLM.
- */
-struct AgentCommand {
-    QString action;   ///< The name of the tool/function to execute (e.g., "write_file")
-    QString target;   ///< The file path, URL, or terminal command string
-    QString payload;  ///< Optional data payload (e.g., file contents to write, JSON args)
-};
+#include "base_agent_action.h"
 
 class AgentActionManager : public QObject {
     Q_OBJECT
@@ -29,12 +24,17 @@ class AgentActionManager : public QObject {
 public:
     /**
      * @brief Constructs the agent action manager.
-     * @param parent The parent QObject, typically the MainWindow.
+     * @param parent The parent QObject, typically the main window.
      */
     explicit AgentActionManager(QObject* parent = nullptr);
 
     /**
-     * @brief Adds an action to the safe-list of capabilities.
+     * @brief Safely cleans up the command registry.
+     */
+    ~AgentActionManager() override;
+
+    /**
+     * @brief Adds an action to the safe-list of non-destructive capabilities.
      * @param action The function name to whitelist (e.g., "write_file").
      */
     void addWhitelistedAction(const QString& action);
@@ -47,14 +47,52 @@ public:
     bool isActionWhitelisted(const QString& action) const;
 
     /**
-     * @brief Executes the validated and approved command on the local machine.
+     * @brief Routes the validated command to its isolated tool class for execution.
      * @param command The fully populated agent command struct.
-     * @return True if the file or action was successfully written/executed.
+     * @param workspacePath The absolute path to the active sandboxed directory.
      */
-    bool executeApprovedAction(const AgentCommand& command);
+    void executeApprovedAction(const AgentCommand& command, const QString& workspacePath);
+
+public slots:
+    /**
+     * @brief The main gateway for all api tool requests. parses args and triggers security.
+     * @param functionName The exact string name of the tool requested by the llm.
+     * @param arguments The json payload containing the tool parameters.
+     * @param workspacePath The absolute path to the active sandboxed directory.
+     */
+    void processFunctionCall(const QString& functionName, const QJsonObject& arguments, const QString& workspacePath);
+
+signals:
+    /**
+     * @brief Emitted when a system message or tool output is ready for the ui.
+     * @param text The formatted string to display.
+     */
+    void cleanTextReady(const QString& text);
 
 private:
-    QSet<QString> whitelistedActions; ///< Collection of pre-approved safe actions
+    QSet<QString> whitelistedActions;         ///< collection of pre-approved safe actions
+    QMap<QString, BaseAgentAction*> registry; ///< dynamic map of registered tool classes
+
+    /**
+     * @brief Internal helper to register a new tool class to the routing engine.
+     * @param action Pointer to the instantiated tool class.
+     */
+    void registerAction(BaseAgentAction* action);
+
+    /**
+     * @brief Security helper to ensure file operations never escape the project workspace.
+     * @param relativeTarget The path provided by the agent.
+     * @param workspacePath The absolute path to the active sandboxed directory.
+     * @return The absolute, verified path, or an empty string if a traversal attack is detected.
+     */
+    [[nodiscard]] QString resolveAndVerifyPath(const QString& relativeTarget, const QString& workspacePath) const;
+
+    /**
+     * @brief Triggers the human-in-the-loop gui modal for destructive actions.
+     * @param command The fully parsed agent command.
+     * @param workspacePath The absolute path to the active sandboxed directory.
+     */
+    void handleSecurityIntercept(const AgentCommand& command, const QString& workspacePath);
 };
 
 #endif // AGENT_MANAGER_H
