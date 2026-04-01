@@ -34,6 +34,7 @@ add_executable(GeminiNativeAgent
     execute_shell_action.cpp
     take_screenshot_action.cpp
     agent_prompt_builder.cpp
+    chat_syntax_highlighter.cpp
 
     base_agent_action.h
 )

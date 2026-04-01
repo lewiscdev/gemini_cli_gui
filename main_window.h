@@ -21,6 +21,7 @@
 
 #include "agent_manager.h"
 #include "database_manager.h"
+#include "chat_syntax_highlighter.h"
 
 // forward declarations to reduce header bloat
 class GeminiApiClient;
@@ -62,7 +63,7 @@ private slots:
     void onResponseReceived(const QString& responseText, const QString& interactionId);
     void onNetworkError(const QString& errorDetails);
     void onUsageMetricsReceived(int inputTokens, int outputTokens, int totalTokens);
-    void handleNativeFunctionCall(const QString& functionName, const QJsonObject& arguments);
+    void handleNativeFunctionCalls(const QJsonArray& toolCalls);
     
     /**
      * @brief Catches the execution results from isolated tool classes.
@@ -91,11 +92,16 @@ private:
     GeminiApiClient* apiClient{nullptr};
     AgentActionManager* agentController{nullptr};
     DatabaseManager* dbManager{nullptr};   ///< central manager for all sqlite operations
+    ChatSyntaxHighlighter* syntaxHighlighter{nullptr};
 
     // --- session state ---
     QString currentSessionId;
     QString currentWorkspacePath;
     QStringList pendingAttachments;
+
+    // --- batch processing state ---
+    bool isBatchProcessing{false};
+    QString batchSystemFeedback;
 
     // --- internal helper methods ---
     

@@ -75,7 +75,7 @@ signals:
     /**
      * @brief Emitted when the LLM natively requests to execute a local tool.
      */
-    void functionCallRequested(const QString& functionName, const QJsonObject& arguments);
+    void functionCallsRequested(const QJsonArray& toolCalls);
 
 private slots:
     /**

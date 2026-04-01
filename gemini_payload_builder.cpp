@@ -17,33 +17,32 @@
 
 QByteArray GeminiPayloadBuilder::buildRequest(const QString& text, const QStringList& attachments, const QJsonArray& tools) {
     QJsonObject rootObj;
-    QJsonArray contentsArray;
-    QJsonObject contentObj;
     QJsonArray partsArray;
 
-    contentObj["role"] = "user";
+    // --- Explicitly define the target LLM ---
+    rootObj["model"] = "gemini-2.5-flash"; 
 
-    // append the primary text prompt
+    // Append the primary text prompt directly to the flattened array
     if (!text.isEmpty()) {
         QJsonObject textPart;
         textPart["text"] = text;
         partsArray.append(textPart);
     }
 
-    // process and append any multi-modal file attachments
+    // Process and append any multi-modal file attachments
     for (const QString& filePath : attachments) {
         QFile file(filePath);
         if (file.open(QIODevice::ReadOnly)) {
             QString mimeType = getMimeType(filePath);
             
-            // if it's a text file (code, logs), append as raw text to save tokens
-            if (mimeType.startsWith("text/") || mimeType == "application/json") {
+            // If it's a text file, append as raw text to save vision tokens
+            if (mimeType.startsWith("text/") || mimeType == "application/json" || mimeType.isEmpty()) {
                 QString fileContent = QString::fromUtf8(file.readAll());
                 QJsonObject textPart;
-                textPart["text"] = QString("--- FILE: %1 ---\n%2").arg(QFileInfo(filePath).fileName(), fileContent);
+                textPart["text"] = QString("\n--- FILE: %1 ---\n%2\n").arg(QFileInfo(filePath).fileName(), fileContent);
                 partsArray.append(textPart);
             } 
-            // if it's an image or binary, base64 encode it for the vision model
+            // If it's an image or binary, base64 encode it for the vision model
             else {
                 QByteArray fileData = file.readAll();
                 QJsonObject inlineDataObj;
@@ -58,11 +57,17 @@ QByteArray GeminiPayloadBuilder::buildRequest(const QString& text, const QString
         }
     }
 
-    contentObj["parts"] = partsArray;
-    contentsArray.append(contentObj);
-    rootObj["contents"] = contentsArray;
+    // --- CRITICAL FIX: The v1beta Interactions API is stateful and flattened. ---
+    // We do not wrap this in 'roles' or 'contents'. We just pass the parts directly to 'input'.
+    if (partsArray.size() == 1 && partsArray[0].toObject().contains("text")) {
+        // If it's just text, we can pass it as a simple string to be ultra-clean
+        rootObj["input"] = partsArray[0].toObject()["text"].toString();
+    } else {
+        // If it's multi-modal, we pass the flattened array of parts
+        rootObj["input"] = partsArray;
+    }
 
-    // inject the agent's tools into the payload
+    // Inject the agent's tools into the payload
     if (!tools.isEmpty()) {
         rootObj["tools"] = tools;
     }

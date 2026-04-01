@@ -97,38 +97,36 @@ void GeminiApiClient::onNetworkReply(QNetworkReply* reply) {
         );
     }
 
-    // parse the multi-modal outputs array for text and tool executions
+    // Parse the actual response payload (Text or Tool Call)
     if (rootObj.contains("outputs")) {
         QJsonArray outputsArray = rootObj["outputs"].toArray();
         QString combinedText = "";
-        bool actionProcessed = false;
+        QJsonArray requestedTools; // Collect all tools requested in this turn
 
         for (int i = 0; i < outputsArray.size(); ++i) {
             QJsonObject outputObj = outputsArray[i].toObject();
             QString type = outputObj["type"].toString();
 
-            // handle standard text output
+            // Handle Standard Text Output
             if (type == "text" && outputObj.contains("text")) {
                 combinedText += outputObj["text"].toString() + "\n";
-                actionProcessed = true;
             }
-            // handle autonomous tool request
+            // Handle Autonomous Tool Request (Batch them!)
             else if (type == "function_call") {
-                QString funcName = outputObj["name"].toString();
-                QJsonObject funcArgs = outputObj["arguments"].toObject();
-                
-                // signal the main window to execute the local action
-                emit functionCallRequested(funcName, funcArgs);
-                actionProcessed = true;
+                requestedTools.append(outputObj);
             }
         }
 
-        // if the agent replied with text, send it to the ui
+        // Print whatever text the agent had to say
         if (!combinedText.isEmpty()) {
             emit responseReceived(combinedText.trimmed(), currentApiInteractionId);
         }
 
-        if (actionProcessed) return;
+        // Emit the BATCH of tools to be processed
+        if (!requestedTools.isEmpty()) {
+            emit functionCallsRequested(requestedTools);
+        }
+        return;
     }
     
     // fallback error logging if the payload format changes unexpectedly

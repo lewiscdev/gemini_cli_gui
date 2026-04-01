@@ -114,6 +114,9 @@ void MainWindow::setupUi() {
 
     chatDisplay = new QTextEdit(this);
     chatDisplay->setReadOnly(true);
+
+    // bind the syntax engine directly to the chat's underlying text document
+syntaxHighlighter = new ChatSyntaxHighlighter(chatDisplay->document());
     
     tokenDisplayLabel = new QLabel("Tokens: 0 In | 0 Out", this);
     tokenDisplayLabel->setAlignment(Qt::AlignRight);
@@ -171,7 +174,7 @@ void MainWindow::initializeConnections() {
     connect(apiClient, &GeminiApiClient::responseReceived, this, &MainWindow::onResponseReceived);
     connect(apiClient, &GeminiApiClient::networkError, this, &MainWindow::onNetworkError);
     connect(apiClient, &GeminiApiClient::usageMetricsReceived, this, &MainWindow::onUsageMetricsReceived);
-    connect(apiClient, &GeminiApiClient::functionCallRequested, this, &MainWindow::handleNativeFunctionCall);
+    connect(apiClient, &GeminiApiClient::functionCallsRequested, this, &MainWindow::handleNativeFunctionCalls);
     
     // dynamically bind the command pattern registry back to the main ui loop
     connect(agentController, &AgentActionManager::cleanTextReady, this, &MainWindow::onAgentSystemFeedback);
@@ -260,7 +263,7 @@ void MainWindow::handleSendClicked() {
             displayMsg += QString(" <i>[Attached %1 file(s)]</i>").arg(pendingAttachments.size());
         }
 
-        chatDisplay->append("<b>You:</b> " + displayMsg);
+        chatDisplay->append("<b>You:</b><br>" + displayMsg.toHtmlEscaped());
         saveInteractionToDb("user", displayMsg);
         
         apiClient->sendPrompt(userInput, pendingAttachments); 
@@ -319,7 +322,8 @@ void MainWindow::dropEvent(QDropEvent *event) {
 // ============================================================================
 
 void MainWindow::onResponseReceived(const QString& responseText, const QString& interactionId) {
-    chatDisplay->append("<b>Agent:</b> " + responseText);
+    // escape html to prevent <iostream> from disappearing, but keep our bold name tags
+    chatDisplay->append("<b>Agent:</b><br>" + responseText.toHtmlEscaped());
     saveInteractionToDb("model", responseText, interactionId);
 }
 
@@ -331,13 +335,45 @@ void MainWindow::onUsageMetricsReceived(int inputTokens, int outputTokens, int t
     tokenDisplayLabel->setText(QString("Tokens: %1 In | %2 Out | %3 Total").arg(inputTokens).arg(outputTokens).arg(totalTokens));
 }
 
-void MainWindow::handleNativeFunctionCall(const QString& functionName, const QJsonObject& arguments) {
-    // ui acts purely as a router, offloading all json parsing and security to the agent manager
-    agentController->processFunctionCall(functionName, arguments, currentWorkspacePath);
+void MainWindow::handleNativeFunctionCalls(const QJsonArray& toolCalls) {
+    isBatchProcessing = true;
+    batchSystemFeedback.clear();
+
+    for (int i = 0; i < toolCalls.size(); ++i) {
+        QJsonObject callObj = toolCalls[i].toObject();
+        QString functionName = callObj["name"].toString();
+        QJsonObject arguments = callObj["arguments"].toObject();
+
+        // The manager parses the call, triggers security modals, and executes isolated classes.
+        // Because of the UI Modals/Event Loops, this synchronously halts until approved/denied.
+        // Every signal emitted during this loop will be caught by onAgentSystemFeedback.
+        agentController->processFunctionCall(functionName, arguments, currentWorkspacePath);
+    }
+
+    isBatchProcessing = false;
+
+    // --- CRITICAL FIX: Send ONE network response back to the LLM for the entire batch ---
+    QString finalFeedback = batchSystemFeedback.trimmed();
+    if (!finalFeedback.isEmpty()) {
+        saveInteractionToDb("system", finalFeedback);
+        apiClient->sendPrompt(finalFeedback);
+    }
 }
 
 void MainWindow::onAgentSystemFeedback(const QString& feedback) {
-    // pipe the result to the database and send it straight back to the llm
-    saveInteractionToDb("system", feedback);
-    apiClient->sendPrompt(feedback);
+    // 1. Ensure the user actually sees the agent's actions in the UI!
+    chatDisplay->append(feedback);
+
+    // 2. Strip HTML tags so the LLM doesn't get confused by our UI styling
+    QString cleanFeedback = feedback;
+    cleanFeedback.replace(QRegularExpression("<[^>]*>"), "");
+
+    // 3. Intercept the network call if we are processing a batch of tools
+    if (isBatchProcessing) {
+        batchSystemFeedback += cleanFeedback + "\n\n";
+    } else {
+        // Fallback for single, non-batched system messages
+        saveInteractionToDb("system", cleanFeedback);
+        apiClient->sendPrompt(cleanFeedback);
+    }
 }
