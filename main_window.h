@@ -18,6 +18,8 @@
 #include <QDropEvent>
 #include <QMimeData>
 #include <QJsonObject>
+#include <QTextBrowser>
+#include <QUrl>
 
 #include "agent_manager.h"
 #include "database_manager.h"
@@ -46,7 +48,8 @@ public:
     ~MainWindow() override;
 
 protected:
-    // --- drag and drop event overrides for multi-modal attachments ---
+    // --- hardware input intercepts ---
+    bool eventFilter(QObject *obj, QEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
 
@@ -70,18 +73,23 @@ private slots:
      */
     void onAgentSystemFeedback(const QString& feedback);
 
+    /**
+     * @brief Intercepts clicks on HTML anchor tags inside the chat display.
+     */
+    void handleAnchorClicked(const QUrl& url);
+
 private:
     // --- ui elements ---
     QWidget* centralWidget{nullptr};
     QVBoxLayout* mainLayout{nullptr};
     
-    QTextEdit* chatDisplay{nullptr};
+    QTextBrowser* chatDisplay{nullptr};
+    QTextEdit* inputField{nullptr};
     QLabel* tokenDisplayLabel{nullptr};
     
     QLabel* lblAttachments{nullptr};
     QPushButton* btnClearFiles{nullptr};
     QPushButton* btnAttach{nullptr};
-    QLineEdit* inputField{nullptr};
     QPushButton* sendButton{nullptr};
     
     QPushButton* btnManageSessions{nullptr};

@@ -30,6 +30,9 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QApplication>
+#include <QClipboard>
+#include <QKeyEvent>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setupUi();
@@ -118,8 +121,9 @@ void MainWindow::setupUi() {
     
     mainLayout->addLayout(topBarLayout); 
 
-    chatDisplay = new QTextEdit(this);
+    chatDisplay = new QTextBrowser(this);
     chatDisplay->setReadOnly(true);
+    chatDisplay->setOpenLinks(false); // We must disable auto-open so we can intercept the copy click!
 
     tokenDisplayLabel = new QLabel("Tokens: 0 In | 0 Out", this);
     tokenDisplayLabel->setAlignment(Qt::AlignRight);
@@ -144,8 +148,10 @@ void MainWindow::setupUi() {
     btnAttach->setFixedSize(30, 30);
     btnAttach->setToolTip("Attach Files");
 
-    inputField = new QLineEdit(this);
-    inputField->setPlaceholderText("Enter command, or drag and drop files here...");
+    inputField = new QTextEdit(this);
+    inputField->setPlaceholderText("Enter command (Shift+Enter for newline), or drag and drop files here...");
+    inputField->setMaximumHeight(80); // Prevent the box from taking up the whole screen
+    inputField->installEventFilter(this); // Tell Qt to funnel keypresses to our interceptor
 
     sendButton = new QPushButton("Send", this);
 
@@ -167,11 +173,11 @@ void MainWindow::setupUi() {
 
 void MainWindow::initializeConnections() {
     connect(sendButton, &QPushButton::clicked, this, &MainWindow::handleSendClicked);
-    connect(inputField, &QLineEdit::returnPressed, this, &MainWindow::handleSendClicked);
     connect(btnAttach, &QPushButton::clicked, this, &MainWindow::attachFiles);
     connect(btnClearFiles, &QPushButton::clicked, this, &MainWindow::clearAttachments);
     connect(btnSettings, &QPushButton::clicked, this, &MainWindow::openSettings);
     connect(btnManageSessions, &QPushButton::clicked, this, &MainWindow::switchSession);
+    connect(chatDisplay, &QTextBrowser::anchorClicked, this, &MainWindow::handleAnchorClicked);
 
     // api routes
     connect(apiClient, &GeminiApiClient::responseReceived, this, &MainWindow::onResponseReceived);
@@ -209,7 +215,7 @@ bool MainWindow::loadHistoryFromDb() {
         chatDisplay->setTextCursor(cursor);
 
         if (data.role == "user") {
-            chatDisplay->insertHtml("<b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(data.content) + "<br>");
+            chatDisplay->insertHtml("<div align=\"right\"><b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(data.content) + "</div><br>");
         } else if (data.role == "model") {
             chatDisplay->insertHtml("<b>Agent:</b><br>" + ChatFormatter::formatMarkdownToHtml(data.content) + "<br>");
         } else if (data.role == "system") {
@@ -278,26 +284,27 @@ void MainWindow::openSettings() {
 // ============================================================================
 
 void MainWindow::handleSendClicked() {
-    QString userInput = inputField->text();
+    // Upgrade from text() to toPlainText() for the new QTextEdit
+    QString userInput = inputField->toPlainText().trimmed(); 
     
     if (!userInput.isEmpty() || !pendingAttachments.isEmpty()) {
         QString displayMsg = userInput;
         if (!pendingAttachments.isEmpty()) {
-            displayMsg += QString(" <i>[Attached %1 file(s)]</i>").arg(pendingAttachments.size());
+            displayMsg += QString("\n<i>[Attached %1 file(s)]</i>").arg(pendingAttachments.size());
         }
 
         QTextCursor cursor = chatDisplay->textCursor();
         cursor.movePosition(QTextCursor::End);
         chatDisplay->setTextCursor(cursor);
         
-        chatDisplay->insertHtml("<b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(displayMsg) + "<br>");
+        // WRAP THE USER INPUT IN A RIGHT-ALIGNED DIV!
+        chatDisplay->insertHtml("<div align=\"right\"><b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(displayMsg) + "</div><br>");
         chatDisplay->ensureCursorVisible();
         
         saveInteractionToDb("user", displayMsg);
         
-        // Fetch and pass the history!
         QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
-        apiClient->sendPrompt(history, userInput, pendingAttachments);
+        apiClient->sendPrompt(history, userInput, pendingAttachments); 
         
         inputField->clear();
         clearAttachments(); 
@@ -412,5 +419,42 @@ void MainWindow::onAgentSystemFeedback(const QString& feedback) {
         saveInteractionToDb("system", cleanFeedback);
         QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
         apiClient->sendPrompt(history, cleanFeedback);
+    }
+}
+
+// ============================================================================
+// HARDWARE INTERCEPTS (KEYBOARD & CLIPBOARD)
+// ============================================================================
+
+bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
+    if (obj == inputField && event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+        
+        if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
+            if (keyEvent->modifiers() & Qt::ShiftModifier) {
+                return false; // Let the QTextEdit naturally insert a newline
+            } else {
+                handleSendClicked(); // Fire the prompt
+                return true; // Consume the event so it doesn't drop a random newline
+            }
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
+}
+
+void MainWindow::handleAnchorClicked(const QUrl& url) {
+    // Check if it's our hidden copy scheme
+    if (url.scheme() == "copy") {
+        // Strip the "copy:" prefix
+        QString payload = url.toString().mid(5); 
+        
+        // Decode the URL-safe Base64 string back into raw C++/Python
+        QByteArray decodedCode = QByteArray::fromBase64(payload.toUtf8(), QByteArray::Base64UrlEncoding);
+        
+        // Push straight to OS clipboard
+        QApplication::clipboard()->setText(QString::fromUtf8(decodedCode));
+        
+        // Brief visual feedback
+        QMessageBox::information(this, "Copied", "Code block copied to clipboard!");
     }
 }
