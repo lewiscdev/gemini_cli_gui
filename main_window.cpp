@@ -13,6 +13,7 @@
 #include "session_dialog.h"
 #include "agent_prompt_builder.h"
 #include "chat_formatter.h"
+#include "theme_manager.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -36,6 +37,7 @@
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setupUi();
+    applyTheme();
     
     // initialize the central database manager
     dbManager = new DatabaseManager(this);
@@ -95,11 +97,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
             apiClient->sendPrompt(history, systemInstructions);
     } else {
-        QTextCursor cursor = chatDisplay->textCursor();
-        cursor.movePosition(QTextCursor::End);
-        chatDisplay->setTextCursor(cursor);
-        chatDisplay->insertHtml("<span style=\"color: green;\">[System: Session Restored Successfully]</span><br><br>");
-        chatDisplay->ensureCursorVisible();
+        chatDisplay->append(formatChatBubble("system", "[System: Session Restored Successfully]", isDarkTheme));
     }
 }
 
@@ -147,6 +145,7 @@ void MainWindow::setupUi() {
     btnAttach = new QPushButton("📎", this);
     btnAttach->setFixedSize(30, 30);
     btnAttach->setToolTip("Attach Files");
+    btnAttach->setObjectName("iconButton");
 
     inputField = new QTextEdit(this);
     inputField->setPlaceholderText("Enter command (Shift+Enter for newline), or drag and drop files here...");
@@ -155,6 +154,16 @@ void MainWindow::setupUi() {
 
     sendButton = new QPushButton("Send", this);
 
+    // 1. Tell both buttons to stretch vertically
+    btnAttach->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
+    sendButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
+
+    // 2. THE HARD CEILING: Force them to stop growing at the exact same height as the text box
+    // (Assuming your inputField->setMaximumHeight() is set to 80)
+    btnAttach->setMaximumHeight(80); 
+    sendButton->setMaximumHeight(80);
+
+    // 3. Add them directly side-by-side
     inputLayout->addWidget(btnAttach);
     inputLayout->addWidget(inputField);
     inputLayout->addWidget(sendButton);
@@ -207,29 +216,8 @@ bool MainWindow::loadHistoryFromDb() {
     QTextCursor cursor = chatDisplay->textCursor();
 
     for (const InteractionData& data : history) {
-        if (!data.apiId.isEmpty()) {
-            lastInteractionId = data.apiId;
-        }
-
-        cursor.movePosition(QTextCursor::End);
-        chatDisplay->setTextCursor(cursor);
-
-        // Native Qt Block Alignment
-        QTextBlockFormat blockFormat;
-
-        if (data.role == "user") {
-            blockFormat.setAlignment(Qt::AlignRight);
-            cursor.insertBlock(blockFormat); // Push the block right
-            chatDisplay->insertHtml("<b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(data.content) + "<br>");
-        } else if (data.role == "model") {
-            blockFormat.setAlignment(Qt::AlignLeft);
-            cursor.insertBlock(blockFormat); // Reset the block left
-            chatDisplay->insertHtml("<b>Agent:</b><br>" + ChatFormatter::formatMarkdownToHtml(data.content) + "<br>");
-        } else if (data.role == "system") {
-            blockFormat.setAlignment(Qt::AlignLeft);
-            cursor.insertBlock(blockFormat); // Reset the block left
-            chatDisplay->insertHtml("<span style=\"color: gray;\">" + data.content + "</span><br>");
-        }
+        if (!data.apiId.isEmpty()) { lastInteractionId = data.apiId; }
+        chatDisplay->append(formatChatBubble(data.role, data.content, isDarkTheme));
     }
 
     chatDisplay->ensureCursorVisible();
@@ -264,11 +252,7 @@ void MainWindow::switchSession() {
             QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
             apiClient->sendPrompt(history, systemInstructions);
         } else {
-            QTextCursor cursor = chatDisplay->textCursor();
-            cursor.movePosition(QTextCursor::End);
-            chatDisplay->setTextCursor(cursor);
-            chatDisplay->insertHtml("<span style=\"color: green;\">[System: Switched to existing session]</span><br><br>");
-            chatDisplay->ensureCursorVisible();
+            chatDisplay->append(formatChatBubble("system", "[System: Switched to existing session]", isDarkTheme));
         }
     }
 }
@@ -279,12 +263,13 @@ void MainWindow::openSettings() {
         QSettings settings;
         apiClient->setApiKey(settings.value("api_key").toString());
         
-        // Use the new cursor method for perfect spacing
-        QTextCursor cursor = chatDisplay->textCursor();
-        cursor.movePosition(QTextCursor::End);
-        chatDisplay->setTextCursor(cursor);
-        chatDisplay->insertHtml("<span style=\"color: green;\">[System: Settings updated successfully]</span><br><br>");
-        chatDisplay->ensureCursorVisible();
+        applyTheme(); // Apply new colors immediately
+        
+        // Redraw the chat history with the new HTML bubbles!
+        chatDisplay->clear();
+        loadHistoryFromDb();
+        
+        chatDisplay->append(formatChatBubble("system", "[System: Settings & Theme updated successfully]", isDarkTheme));
     }
 }
 
@@ -302,17 +287,7 @@ void MainWindow::handleSendClicked() {
             displayMsg += QString("\n<i>[Attached %1 file(s)]</i>").arg(pendingAttachments.size());
         }
 
-        QTextCursor cursor = chatDisplay->textCursor();
-        cursor.movePosition(QTextCursor::End);
-        chatDisplay->setTextCursor(cursor);
-
-        QTextBlockFormat blockFormat;
-        blockFormat.setAlignment(Qt::AlignRight);
-        cursor.insertBlock(blockFormat);
-        
-        chatDisplay->insertHtml("<b>You:</b><br>" + ChatFormatter::formatMarkdownToHtml(displayMsg) + "<br>");
-        chatDisplay->ensureCursorVisible();
-        
+        chatDisplay->append(formatChatBubble("user", displayMsg, isDarkTheme));
         saveInteractionToDb("user", displayMsg);
         
         QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
@@ -372,17 +347,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
 // ============================================================================
 
 void MainWindow::onResponseReceived(const QString& responseText, const QString& interactionId) {
-    QTextCursor cursor = chatDisplay->textCursor();
-    cursor.movePosition(QTextCursor::End);
-    chatDisplay->setTextCursor(cursor);
-    
-    QTextBlockFormat blockFormat;
-    blockFormat.setAlignment(Qt::AlignLeft);
-    cursor.insertBlock(blockFormat);
-
-    chatDisplay->insertHtml("<b>Agent:</b><br>" + ChatFormatter::formatMarkdownToHtml(responseText) + "<br>");
-    chatDisplay->ensureCursorVisible();
-
+    chatDisplay->append(formatChatBubble("model", responseText, isDarkTheme));
     saveInteractionToDb("model", responseText, interactionId);
 }
 
@@ -473,4 +438,75 @@ void MainWindow::handleAnchorClicked(const QUrl& url) {
         // Brief visual feedback
         QMessageBox::information(this, "Copied", "Code block copied to clipboard!");
     }
+}
+
+// ============================================================================
+// THEME & UI RENDERING ENGINE
+// ============================================================================
+
+void MainWindow::applyTheme() {
+    bool dark = ThemeManager::isDark();
+    this->isDarkTheme = dark; // Update your bool for the ChatFormatter
+    
+    // Apply the global app style
+    this->setStyleSheet(ThemeManager::getStyleSheet(dark));
+    
+    // Specifically fix the chat display's viewport background
+    QPalette p = chatDisplay->palette();
+    p.setColor(QPalette::Base, dark ? QColor("#0F172A") : QColor("#F8FAFC"));
+    p.setColor(QPalette::Text, dark ? QColor("#F8FAFC") : QColor("#0F172A"));
+    chatDisplay->setPalette(p);
+}
+
+QString MainWindow::formatChatBubble(const QString& role, const QString& content, bool isDark) {
+    QString bubbleBg;
+    QString textColor;
+    QString borderColor;
+    
+    // 1. Define a high-contrast palette
+    if (isDark) {
+        bubbleBg = (role == "user") ? "#334155" : "#020617"; 
+        borderColor = "#475569"; 
+        textColor = "#F8FAFC";
+    } else {
+        bubbleBg = (role == "user") ? "#E2E8F0" : "#F8F9FA"; 
+        borderColor = "#CBD5E1"; 
+        textColor = "#0F172A";
+    }
+    
+    QString name = (role == "user") ? "You" : "Agent";
+    QString parsedContent = ChatFormatter::formatMarkdownToHtml(content, isDark);
+
+    // 2. The Unified Table Structure
+    QString html = "<table width=\"100%\" cellspacing=\"10\" cellpadding=\"0\"><tr>";
+    
+    QString bubbleStyle = QString("background-color: %1; border: 1px solid %2;").arg(bubbleBg, borderColor);
+
+    if (role == "user") {
+        html += "<td width=\"20%\"></td>"; // Push Right
+        html += QString("<td width=\"80%\" style=\"%1\">"
+                        "<table width=\"100%\" cellpadding=\"14\" cellspacing=\"0\">"
+                        "<tr><td style=\"color: %2;\"><b>%3</b><br><br>%4</td></tr>"
+                        "</table></td>").arg(bubbleStyle, textColor, name, parsedContent);
+    } else if (role == "model") {
+        html += QString("<td width=\"80%\" style=\"%1\">"
+                        "<table width=\"100%\" cellpadding=\"14\" cellspacing=\"0\">"
+                        "<tr><td style=\"color: %2;\"><b>%3</b><br><br>%4</td></tr>"
+                        "</table></td>").arg(bubbleStyle, textColor, name, parsedContent);
+        html += "<td width=\"20%\"></td>"; // Push Left
+    } else {
+        // --- THE NEW SYSTEM BAR ---
+        QString barBg = isDark ? "#1E293B" : "#F8FAFC";
+        QString barBorder = isDark ? "#334155" : "#E2E8F0";
+        QString systemColor = isDark ? "#94A3B8" : "#64748B";
+        
+        // Use colspan="2" to span the entire chat width evenly
+        html += QString("<td colspan=\"2\" align=\"center\">"
+                        "<table width=\"100%\" cellpadding=\"8\" cellspacing=\"0\" style=\"background-color: %1; border: 1px solid %2; border-radius: 6px;\">"
+                        "<tr><td align=\"center\" style=\"color: %3; font-size: 11px; font-weight: bold; letter-spacing: 0.5px;\">%4</td></tr>"
+                        "</table></td>").arg(barBg, barBorder, systemColor, content);
+    }
+    
+    html += "</tr></table>";
+    return html;
 }

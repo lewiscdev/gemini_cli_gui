@@ -136,6 +136,18 @@ private:
      * @return True if existing history was found and loaded.
      */
     bool loadHistoryFromDb();
+
+    /**
+     * @brief Applies QSS stylesheets and updates internal theme state.
+     */
+    void applyTheme();
+
+    /**
+     * @brief Wraps parsed HTML in a structural layout table to create chat bubbles.
+     */
+    QString formatChatBubble(const QString& role, const QString& content, bool isDark);
+
+    bool isDarkTheme{true}; // Tracks global theme state
 };
 
 #endif // MAIN_WINDOW_H

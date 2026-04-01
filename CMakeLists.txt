@@ -37,6 +37,7 @@ add_executable(GeminiNativeAgent
     chat_formatter.cpp
 
     base_agent_action.h
+    theme_manager.h
 )
 
 # link the required qt modules to the executable

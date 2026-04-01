@@ -20,6 +20,8 @@ public:
      * @return A styled HTML string ready for injection into a QTextEdit.
      */
     [[nodiscard]] static QString formatMarkdownToHtml(const QString& markdown);
+
+    [[nodiscard]] static QString formatMarkdownToHtml(const QString& markdown, bool isDarkTheme);
 };
 
 #endif // CHAT_FORMATTER_H

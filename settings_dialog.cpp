@@ -8,6 +8,7 @@
  */
 
 #include "settings_dialog.h"
+#include "theme_manager.h"
 
 #include <QFormLayout>
 #include <QGroupBox>
@@ -77,6 +78,19 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     mainLayout->addWidget(ftpGroup);
 
     // ========================================================================
+    // UI APPEARANCE
+    // ========================================================================
+    QGroupBox* uiGroup = new QGroupBox("Appearance", this);
+    QFormLayout* uiLayout = new QFormLayout(uiGroup);
+    
+    themeSelector = new QComboBox(this);
+    themeSelector->addItem("Dark Mode", "dark");
+    themeSelector->addItem("Light Mode", "light");
+    uiLayout->addRow("Application Theme:", themeSelector);
+    
+    mainLayout->addWidget(uiGroup);
+    
+    // ========================================================================
     // DIALOG CONTROLS & INITIALIZATION
     // ========================================================================
     QHBoxLayout* buttonLayout = new QHBoxLayout();
@@ -99,9 +113,16 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     ftpUsernameInput->setText(settings.value("ftp_username", "").toString());
     ftpPasswordInput->setText(settings.value("ftp_password", "").toString());
 
+    // Load theme
+    QString savedTheme = settings.value("theme", "dark").toString();
+    int index = themeSelector->findData(savedTheme);
+    if (index != -1) themeSelector->setCurrentIndex(index);
+
     // --- Connections ---
     connect(btnSave, &QPushButton::clicked, this, &SettingsDialog::saveSettings);
     connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
+
+    ThemeManager::apply(this);
 }
 
 /**
@@ -120,6 +141,8 @@ void SettingsDialog::saveSettings() {
     settings.setValue("api_key", apiKey);
     settings.setValue("github_pat", githubPatInput->text().trimmed());
     
+    settings.setValue("theme", themeSelector->currentData().toString());
+
     // Save FTP Configs
     settings.setValue("ftp_host", ftpHostInput->text().trimmed());
     settings.setValue("ftp_port", ftpPortInput->value());
@@ -155,4 +178,8 @@ QString SettingsDialog::getFtpUsername() const {
 
 QString SettingsDialog::getFtpPassword() const {
     return ftpPasswordInput->text();
+}
+
+QString SettingsDialog::getTheme() const {
+    return themeSelector->currentData().toString();
 }

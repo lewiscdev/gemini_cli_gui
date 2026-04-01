@@ -12,6 +12,7 @@
 
 #include <QDialog>
 #include <QString>
+#include <QComboBox>
 
 // Forward declarations to reduce header dependency bloat
 class QLineEdit;
@@ -26,6 +27,8 @@ public:
      * @param parent The parent widget, typically the MainWindow.
      */
     explicit SettingsDialog(QWidget* parent = nullptr);
+
+    QString getTheme() const;
 
     // --- Credential Getters ---
     QString getApiKey() const;
@@ -44,6 +47,8 @@ private slots:
     void saveSettings();
 
 private:
+    QComboBox* themeSelector;
+
     // --- API Input Fields ---
     QLineEdit* apiKeyInput;     ///< Input field for the Gemini API Key
     QLineEdit* githubPatInput;  ///< Input field for the GitHub PAT

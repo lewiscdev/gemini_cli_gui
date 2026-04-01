@@ -8,6 +8,7 @@
  */
 
 #include "session_dialog.h"
+#include "theme_manager.h"
 
 #include <QFileDialog>
 #include <QHBoxLayout>
@@ -53,6 +54,8 @@ SessionDialog::SessionDialog(DatabaseManager* db, QWidget* parent)
     connect(sessionList, &QListWidget::itemDoubleClicked, this, &SessionDialog::selectAndClose);
 
     loadSessionsFromDb();
+
+    ThemeManager::apply(this);
 }
 
 void SessionDialog::loadSessionsFromDb() {
