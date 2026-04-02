@@ -13,11 +13,15 @@
 QJsonArray ToolSchemaProvider::getAvailableTools() {
     QJsonArray toolsArray;
 
+    QJsonObject rationaleObj; 
+    rationaleObj["type"] = "STRING"; 
+    rationaleObj["description"] = "A short explanation of WHY you are using this tool, to be shown to the user for approval.";
+
     // --- tool 1: write_file ---
     QJsonObject wfPayload; wfPayload["type"] = "STRING"; wfPayload["description"] = "The exact text content to write.";
     QJsonObject wfTarget; wfTarget["type"] = "STRING"; wfTarget["description"] = "Relative file path (e.g., src/main.cpp).";
-    QJsonObject wfProps; wfProps["payload"] = wfPayload; wfProps["target"] = wfTarget;
-    QJsonArray wfReq; wfReq.append("target"); wfReq.append("payload");
+    QJsonObject wfProps; wfProps["payload"] = wfPayload; wfProps["target"] = wfTarget; wfProps["rationale"] = rationaleObj;
+    QJsonArray wfReq; wfReq.append("target"); wfReq.append("payload"); wfReq.append("rationale");
     QJsonObject wfParams; wfParams["type"] = "OBJECT"; wfParams["properties"] = wfProps; wfParams["required"] = wfReq;
     
     QJsonObject writeFileTool;
@@ -29,8 +33,8 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
 
     // --- tool 2: read_file ---
     QJsonObject rfTarget; rfTarget["type"] = "STRING"; rfTarget["description"] = "Relative file path to read (e.g., CMakeLists.txt).";
-    QJsonObject rfProps; rfProps["target"] = rfTarget;
-    QJsonArray rfReq; rfReq.append("target");
+    QJsonObject rfProps; rfProps["target"] = rfTarget; rfProps["rationale"] = rationaleObj;
+    QJsonArray rfReq; rfReq.append("target"); rfReq.append("rationale");
     QJsonObject rfParams; rfParams["type"] = "OBJECT"; rfParams["properties"] = rfProps; rfParams["required"] = rfReq;
 
     QJsonObject readFileTool;
@@ -42,8 +46,8 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
 
     // --- tool 3: list_directory ---
     QJsonObject ldTarget; ldTarget["type"] = "STRING"; ldTarget["description"] = "Relative directory path to list. Use '.' for the root workspace.";
-    QJsonObject ldProps; ldProps["target"] = ldTarget;
-    QJsonArray ldReq; ldReq.append("target");
+    QJsonObject ldProps; ldProps["target"] = ldTarget; ldProps["rationale"] = rationaleObj;
+    QJsonArray ldReq; ldReq.append("target"); ldReq.append("rationale");
     QJsonObject ldParams; ldParams["type"] = "OBJECT"; ldParams["properties"] = ldProps; ldParams["required"] = ldReq;
 
     QJsonObject listDirTool;
@@ -55,8 +59,8 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
 
     // --- tool 4: execute_shell_command ---
     QJsonObject escCommand; escCommand["type"] = "STRING"; escCommand["description"] = "The terminal/shell command to execute (e.g., 'git status', 'cmake --build .', 'npm run test').";
-    QJsonObject escProps; escProps["command"] = escCommand;
-    QJsonArray escReq; escReq.append("command");
+    QJsonObject escProps; escProps["command"] = escCommand; escProps["rationale"] = rationaleObj;
+    QJsonArray escReq; escReq.append("command"); escReq.append("rationale");
     QJsonObject escParams; escParams["type"] = "OBJECT"; escParams["properties"] = escProps; escParams["required"] = escReq;
 
     QJsonObject executeShellTool;
@@ -69,8 +73,8 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
     // --- tool 5: upload_ftp ---
     QJsonObject ftpLocal; ftpLocal["type"] = "STRING"; ftpLocal["description"] = "Relative path of the local file to upload (e.g., index.html).";
     QJsonObject ftpRemote; ftpRemote["type"] = "STRING"; ftpRemote["description"] = "The destination path and filename on the FTP server (e.g., /public_html/index.html).";
-    QJsonObject ftpProps; ftpProps["local_path"] = ftpLocal; ftpProps["remote_path"] = ftpRemote;
-    QJsonArray ftpReq; ftpReq.append("local_path"); ftpReq.append("remote_path");
+    QJsonObject ftpProps; ftpProps["local_path"] = ftpLocal; ftpProps["remote_path"] = ftpRemote; ftpProps["rationale"] = rationaleObj;
+    QJsonArray ftpReq; ftpReq.append("local_path"); ftpReq.append("remote_path"); ftpReq.append("rationale");
     QJsonObject ftpParams; ftpParams["type"] = "OBJECT"; ftpParams["properties"] = ftpProps; ftpParams["required"] = ftpReq;
 
     QJsonObject uploadFtpTool;
@@ -82,8 +86,8 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
 
     // --- tool 6: fetch_webpage ---
     QJsonObject fwUrl; fwUrl["type"] = "STRING"; fwUrl["description"] = "The full HTTP/HTTPS URL of the webpage to fetch (e.g., https://my-test-site.com/index.html).";
-    QJsonObject fwProps; fwProps["url"] = fwUrl;
-    QJsonArray fwReq; fwReq.append("url");
+    QJsonObject fwProps; fwProps["url"] = fwUrl; fwProps["rationale"] = rationaleObj;
+    QJsonArray fwReq; fwReq.append("url"); fwReq.append("rationale");
     QJsonObject fwParams; fwParams["type"] = "OBJECT"; fwParams["properties"] = fwProps; fwParams["required"] = fwReq;
 
     QJsonObject fetchWebpageTool;
@@ -106,8 +110,8 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
     // --- tool 8: execute_code ---
     QJsonObject ecLang; ecLang["type"] = "STRING"; ecLang["description"] = "The programming language to execute (supported: 'python', 'javascript', 'cpp').";
     QJsonObject ecCode; ecCode["type"] = "STRING"; ecCode["description"] = "The raw source code to execute.";
-    QJsonObject ecProps; ecProps["language"] = ecLang; ecProps["code"] = ecCode;
-    QJsonArray ecReq; ecReq.append("language"); ecReq.append("code");
+    QJsonObject ecProps; ecProps["language"] = ecLang; ecProps["code"] = ecCode; ecProps["rationale"] = rationaleObj;
+    QJsonArray ecReq; ecReq.append("language"); ecReq.append("code"); ecReq.append("rationale");
     QJsonObject ecParams; ecParams["type"] = "OBJECT"; ecParams["properties"] = ecProps; ecParams["required"] = ecReq;
 
     QJsonObject executeCodeTool;
@@ -117,14 +121,22 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
     executeCodeTool["parameters"] = ecParams;
     toolsArray.append(executeCodeTool);
 
-    // --- tool 9: git_manager ---
-    QJsonObject gmItems; gmItems["type"] = "STRING";
-    QJsonObject gmArgs; gmArgs["type"] = "ARRAY"; 
-    gmArgs["description"] = "List of arguments for the git command (e.g., ['commit', '-m', 'Initial commit']). Do not include the word 'git'.";
-    gmArgs["items"] = gmItems;
+    // --- tool: git_manager (BATCH EDITION) ---
+    QJsonObject gmInnerItems; gmInnerItems["type"] = "STRING";
+    QJsonObject gmOuterItems; gmOuterItems["type"] = "ARRAY"; gmOuterItems["items"] = gmInnerItems;
     
-    QJsonObject gmProps; gmProps["args"] = gmArgs;
-    QJsonArray gmReq; gmReq.append("args");
+    QJsonObject gmBatches; gmBatches["type"] = "ARRAY"; 
+    gmBatches["description"] = "A list of git commands to execute sequentially as a batch. Each command is an array of arguments. Example: [ ['add', '.'], ['commit', '-m', 'Init'], ['status'] ]";
+    gmBatches["items"] = gmOuterItems;
+    
+    QJsonObject gmProps; 
+    gmProps["command_blocks"] = gmBatches;
+    gmProps["rationale"] = rationaleObj; // Don't forget the rationale!
+    
+    QJsonArray gmReq; 
+    gmReq.append("command_blocks");
+    gmReq.append("rationale");
+    
     QJsonObject gmParams; gmParams["type"] = "OBJECT"; 
     gmParams["properties"] = gmProps; 
     gmParams["required"] = gmReq;
@@ -132,7 +144,7 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
     QJsonObject gitManagerTool;
     gitManagerTool["type"] = "function"; 
     gitManagerTool["name"] = "git_manager";
-    gitManagerTool["description"] = "Executes Git commands in the workspace. Used to check status, stage files, and commit.";
+    gitManagerTool["description"] = "Executes a batch of Git commands sequentially. Use this to group logical git operations (like add + commit + push) into a single execution block.";
     gitManagerTool["parameters"] = gmParams;
     toolsArray.append(gitManagerTool);
 

@@ -75,6 +75,7 @@ void AgentActionManager::processFunctionCall(const QString& functionName, const 
 
     AgentCommand command;
     command.action = functionName;
+    command.rationale = arguments["rationale"].toString();
 
     // map arguments for the command pattern registry
     if (functionName == "write_file") {
@@ -91,9 +92,8 @@ void AgentActionManager::processFunctionCall(const QString& functionName, const 
         command.payload = arguments["code"].toString();
     }
     else if (functionName == "git_manager") {
-        command.target = "Git Repository";
-        // Convert the JSON array into a compact string payload so the action class can decode it
-        command.payload = QJsonDocument(arguments["args"].toArray()).toJson(QJsonDocument::Compact);
+        command.target = "Git Repository (Batch)";
+        command.payload = QJsonDocument(arguments["command_blocks"].toArray()).toJson(QJsonDocument::Compact);
     }
     else if (functionName == "execute_shell_command") {
         command.target = arguments["command"].toString(); 
@@ -180,9 +180,18 @@ void AgentActionManager::handleSecurityIntercept(const AgentCommand& command, co
     
     QMessageBox msgBox(parentWidget);
     msgBox.setWindowTitle("Agent Action Approval");
-    msgBox.setText(QString("The agent wants to execute: <b>%1</b>\nTarget: %2\n\nDo you allow this?").arg(command.action, command.target));
+
+    QString htmlText = QString(
+        "The agent wants to execute: <b>%1</b><br>"
+        "Target: %2<br><br>"
+        "<b>Reasoning:</b><br><i>%3</i><br><br>"
+        "Do you allow this?"
+    ).arg(command.action, command.target, command.rationale);
+
+    msgBox.setText(htmlText);
+    msgBox.setTextFormat(Qt::RichText);
     msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-    msgBox.setDefaultButton(QMessageBox::No);
+    msgBox.setDefaultButton(QMessageBox::Yes);
 
     if (msgBox.exec() == QMessageBox::Yes) {
         emit cleanTextReady(QString("<span style=\"color: green;\">[System: Approved %1 on %2...]</span>").arg(command.action, command.target));

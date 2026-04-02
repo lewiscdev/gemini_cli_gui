@@ -20,6 +20,7 @@ struct AgentCommand {
     QString action;   ///< The name of the tool/function to execute (e.g., "write_file")
     QString target;   ///< The file path, URL, or terminal command string
     QString payload;  ///< Optional data payload (e.g., file contents to write, JSON args)
+    QString rationale; ///< The reason for executing this tool
 };
 
 class BaseAgentAction : public QObject {
