@@ -15,7 +15,12 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QNetworkRequest>
+#include <QNetworkReply>
 #include <QUrl>
+
+// ============================================================================
+// constructor and initialization
+// ============================================================================
 
 GeminiApiClient::GeminiApiClient(QObject* parent) : QObject(parent) {
     networkManager = new QNetworkAccessManager(this);
@@ -32,6 +37,10 @@ void GeminiApiClient::setApiKey(const QString& key) {
     apiKey = key;
 }
 
+// ============================================================================
+// session management
+// ============================================================================
+
 void GeminiApiClient::restoreSession(const QString& interactionId) {
     // injects the saved state from sqlite back into the networking client
     currentApiInteractionId = interactionId;
@@ -41,6 +50,10 @@ void GeminiApiClient::resetSession() {
     // severs the contextual thread so the llm starts with a blank memory slate
     currentApiInteractionId.clear();
 }
+
+// ============================================================================
+// prompt transmission
+// ============================================================================
 
 void GeminiApiClient::sendPrompt(const QList<InteractionData>& history, const QString& text, const QStringList& attachments) {
     if (apiKey.isEmpty()) {
@@ -58,6 +71,10 @@ void GeminiApiClient::sendPrompt(const QList<InteractionData>& history, const QS
     networkManager->post(request, finalPayload);
 }
 
+// ============================================================================
+// network callbacks
+// ============================================================================
+
 void GeminiApiClient::onNetworkReply(QNetworkReply* reply) {
     reply->deleteLater();
 
@@ -69,12 +86,12 @@ void GeminiApiClient::onNetworkReply(QNetworkReply* reply) {
     QByteArray responseData = reply->readAll();
     QJsonObject rootObj = QJsonDocument::fromJson(responseData).object();
 
-    // Extract the stateful tracking ID
+    // extract the stateful tracking id
     if (rootObj.contains("id")) {
         currentApiInteractionId = rootObj["id"].toString();
     }
 
-    // Extract live token consumption metrics (snake_case as per docs)
+    // extract live token consumption metrics (snake_case as per docs)
     if (rootObj.contains("usage")) {
         QJsonObject usage = rootObj["usage"].toObject();
         emit usageMetricsReceived(
@@ -84,7 +101,7 @@ void GeminiApiClient::onNetworkReply(QNetworkReply* reply) {
         );
     }
 
-    // Parse the outputs array for text and tool executions
+    // parse the outputs array for text and tool executions
     if (rootObj.contains("outputs")) {
         QJsonArray outputsArray = rootObj["outputs"].toArray();
         QString combinedText = "";

@@ -12,52 +12,96 @@
 
 #include <QDialog>
 #include <QString>
-#include <QComboBox>
 
-// Forward declarations to reduce header dependency bloat
+// forward declarations to reduce header dependency bloat
 class QLineEdit;
 class QSpinBox;
+class QComboBox;
 
 class SettingsDialog : public QDialog {
     Q_OBJECT
 
 public:
+    // ============================================================================
+    // constructor
+    // ============================================================================
+
     /**
-     * @brief Constructs the Settings Dialog and populates it with existing saved keys.
-     * @param parent The parent widget, typically the MainWindow.
+     * @brief Constructs the settings dialog and populates it with existing saved keys.
+     * @param parent The parent widget, typically the main window.
      */
     explicit SettingsDialog(QWidget* parent = nullptr);
 
+    // ============================================================================
+    // public accessors
+    // ============================================================================
+
+    /**
+     * @brief Retrieves the currently selected application theme.
+     * @return A string representing the theme (e.g., "dark" or "light").
+     */
     QString getTheme() const;
 
-    // --- Credential Getters ---
+    /**
+     * @brief Retrieves the configured Gemini API key.
+     * @return The API key string.
+     */
     QString getApiKey() const;
+    
+    /**
+     * @brief Retrieves the configured GitHub personal access token.
+     * @return The GitHub PAT string.
+     */
     QString getGithubPat() const;
     
-    // --- FTP Configuration Getters ---
+    /**
+     * @brief Retrieves the configured FTP host address.
+     * @return The FTP host string.
+     */
     QString getFtpHost() const;
+    
+    /**
+     * @brief Retrieves the configured FTP port number.
+     * @return The integer port number.
+     */
     int getFtpPort() const;
+    
+    /**
+     * @brief Retrieves the configured FTP username.
+     * @return The FTP username string.
+     */
     QString getFtpUsername() const;
+    
+    /**
+     * @brief Retrieves the configured FTP password.
+     * @return The FTP password string.
+     */
     QString getFtpPassword() const;
 
 private slots:
+    // ============================================================================
+    // ui interaction slots
+    // ============================================================================
+
     /**
      * @brief Persists the active input values to the local OS settings registry.
      */
     void saveSettings();
 
 private:
-    QComboBox* themeSelector;
+    // ============================================================================
+    // ui elements
+    // ============================================================================
 
-    // --- API Input Fields ---
-    QLineEdit* apiKeyInput;     ///< Input field for the Gemini API Key
-    QLineEdit* githubPatInput;  ///< Input field for the GitHub PAT
+    QComboBox* themeSelector;     ///< dropdown for selecting application theme
+
+    QLineEdit* apiKeyInput;       ///< input field for the gemini api key
+    QLineEdit* githubPatInput;    ///< input field for the github pat
     
-    // --- FTP Input Fields ---
-    QLineEdit* ftpHostInput;      ///< Input field for the FTP server hostname or IP
-    QSpinBox* ftpPortInput;      ///< Numeric spinner for the FTP port (default 21)
-    QLineEdit* ftpUsernameInput;  ///< Input field for the FTP username
-    QLineEdit* ftpPasswordInput;  ///< Input field for the FTP password
+    QLineEdit* ftpHostInput;      ///< input field for the ftp server hostname or ip
+    QSpinBox* ftpPortInput;       ///< numeric spinner for the ftp port
+    QLineEdit* ftpUsernameInput;  ///< input field for the ftp username
+    QLineEdit* ftpPasswordInput;  ///< input field for the ftp password
 };
 
 #endif // SETTINGS_DIALOG_H

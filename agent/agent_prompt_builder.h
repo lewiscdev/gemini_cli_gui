@@ -13,6 +13,10 @@
 
 class AgentPromptBuilder {
 public:
+    // ============================================================================
+    // public prompt builders
+    // ============================================================================
+
     /**
      * @brief Dynamically constructs the comprehensive system instructions.
      * @param workspacePath The absolute path to the active sandboxed directory.

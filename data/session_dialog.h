@@ -23,12 +23,20 @@ class SessionDialog : public QDialog {
     Q_OBJECT
 
 public:
+    // ============================================================================
+    // constructor and initialization
+    // ============================================================================
+
     /**
      * @brief Constructs the session dialog using an injected database manager.
      * @param db Pointer to the active database manager instance.
      * @param parent The parent widget, typically the main window.
      */
     explicit SessionDialog(DatabaseManager* db, QWidget* parent = nullptr);
+
+    // ============================================================================
+    // public interface
+    // ============================================================================
 
     /**
      * @brief Retrieves the data for the session the user just selected.
@@ -37,7 +45,9 @@ public:
     [[nodiscard]] SessionData getSelectedSession() const;
 
 private slots:
-    // --- ui interaction slots ---
+    // ============================================================================
+    // ui interaction slots
+    // ============================================================================
     
     /**
      * @brief Queries the database manager and populates the list widget.
@@ -60,16 +70,18 @@ private slots:
     void selectAndClose();
 
 private:
-    DatabaseManager* dbManager;  ///< pointer to the centralized database manager
+    // ============================================================================
+    // internal state and ui elements
+    // ============================================================================
     
-    // --- ui pointers ---
-    QListWidget* sessionList{nullptr};
-    QPushButton* btnNew{nullptr};
-    QPushButton* btnDelete{nullptr};
-    QPushButton* btnLoad{nullptr};
+    DatabaseManager* dbManager;        ///< pointer to the centralized database manager
     
-    // --- internal state ---
-    SessionData selectedSession; ///< holds the data of the currently active session
+    QListWidget* sessionList{nullptr}; ///< displays the list of available saved sessions
+    QPushButton* btnNew{nullptr};      ///< button to trigger the creation of a new session
+    QPushButton* btnDelete{nullptr};   ///< button to delete the currently highlighted session
+    QPushButton* btnLoad{nullptr};     ///< button to load the currently highlighted session
+    
+    SessionData selectedSession;       ///< holds the data of the currently active session
 };
 
 #endif // SESSION_DIALOG_H

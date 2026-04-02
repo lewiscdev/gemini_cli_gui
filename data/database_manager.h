@@ -14,28 +14,36 @@
 #include <QString>
 #include <QList>
 
+// ============================================================================
+// data structures
+// ============================================================================
+
 /**
  * @brief A lightweight data structure representing a saved agent session.
  */
 struct SessionData {
-    QString id;         ///< Unique UUID linking the session to the SQLite database
-    QString name;       ///< Human-readable project/session name
-    QString workspace;  ///< Absolute path to the isolated local sandbox directory
+    QString id;         ///< unique uuid linking the session to the sqlite database
+    QString name;       ///< human-readable project/session name
+    QString workspace;  ///< absolute path to the isolated local sandbox directory
 };
 
 /**
  * @brief Data structure representing a single chat turn or system event.
  */
 struct InteractionData {
-    QString role;       ///< The entity that spoke (e.g., "user", "model", "system")
-    QString content;    ///< The exact text payload
-    QString apiId;      ///< The stateful tracking ID from Google's API
+    QString role;       ///< the entity that spoke (e.g., "user", "model", "system")
+    QString content;    ///< the exact text payload
+    QString apiId;      ///< the stateful tracking id from google's api
 };
 
 class DatabaseManager : public QObject {
     Q_OBJECT
 
 public:
+    // ============================================================================
+    // constructor and initialization
+    // ============================================================================
+
     /**
      * @brief Constructs the database manager.
      * @param parent The parent QObject.
@@ -49,7 +57,7 @@ public:
     bool initializeDatabase();
 
     // ============================================================================
-    // SESSION MANAGEMENT
+    // session management
     // ============================================================================
 
     /**
@@ -81,7 +89,7 @@ public:
     void updateSessionTimestamp(const QString& id);
 
     // ============================================================================
-    // INTERACTION HISTORY
+    // interaction history
     // ============================================================================
 
     /**
@@ -102,6 +110,10 @@ public:
     QList<InteractionData> getInteractions(const QString& sessionId) const;
 
 private:
+    // ============================================================================
+    // private helper methods
+    // ============================================================================
+
     /**
      * @brief Internal helper to ensure the necessary tables exist before querying.
      * @return True if tables exist or were created successfully.

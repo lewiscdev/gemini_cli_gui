@@ -10,17 +10,24 @@
 #ifndef GEMINI_PAYLOAD_BUILDER_H
 #define GEMINI_PAYLOAD_BUILDER_H
 
-#include "database_manager.h"
-
 #include <QByteArray>
 #include <QString>
 #include <QStringList>
 #include <QJsonArray>
+#include <QList>
+
+// forward declarations to reduce header bloat
+struct InteractionData;
 
 class GeminiPayloadBuilder {
 public:
+    // ============================================================================
+    // public payload builders
+    // ============================================================================
+
     /**
      * @brief Builds the complete JSON request body for the LLM.
+     * @param history The chronological list of prior interactions.
      * @param text The user's text prompt or system instruction.
      * @param attachments A list of local file paths to attach (images/text).
      * @param tools The JSON array of available agent tools.
@@ -29,6 +36,10 @@ public:
     [[nodiscard]] static QByteArray buildRequest(const QList<InteractionData>& history, const QString& text, const QStringList& attachments, const QJsonArray& tools);
 
 private:
+    // ============================================================================
+    // private helper methods
+    // ============================================================================
+
     /**
      * @brief Determines the correct MIME type based on file extension.
      * @param filePath The local path to the file.

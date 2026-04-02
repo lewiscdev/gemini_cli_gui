@@ -1,10 +1,10 @@
 /**
  * @file tool_schema_provider.h
- * @brief Provides the JSON schema definitions for all agent capabilities.
+ * @brief Generates the json schema definitions for the gemini api.
  *
- * This class encapsulates the construction of the JSON tools array required
- * by the Gemini API, decoupling the heavy schema definitions from the
- * asynchronous networking client.
+ * This static utility class provides the exact json structure required 
+ * by the gemini api to understand what local tools are available, 
+ * what parameters they require, and how to invoke them.
  */
 
 #ifndef TOOL_SCHEMA_PROVIDER_H
@@ -14,9 +14,13 @@
 
 class ToolSchemaProvider {
 public:
+    // ============================================================================
+    // public schema provider
+    // ============================================================================
+
     /**
-     * @brief Generates the flattened JSON schema for all available agent tools.
-     * @return A JSON array structured strictly according to the API specification.
+     * @brief Builds and returns the comprehensive array of tool definitions.
+     * @return A QJsonArray containing the strict OpenAPI-style schemas for every capability.
      */
     [[nodiscard]] static QJsonArray getAvailableTools();
 };

@@ -10,18 +10,18 @@
 #include "main_window.h"
 
 int main(int argc, char *argv[]) {
-    // Initialize the Qt application object required for GUI and event handling
+    // initialize the qt application object required for gui and event handling
     QApplication app(argc, argv);
     
-    // Persistent OS registry setup
+    // persistent os registry setup for saving api keys and settings
     QApplication::setOrganizationName("GeminiNativeAgent");
     QApplication::setOrganizationDomain("gemininativeagent.local");
     QApplication::setApplicationName("GeminiNativeAgent");
 
-    // Create and display the primary application window
+    // create and display the primary application window
     MainWindow mainWindow;
     mainWindow.show();
     
-    // Execute the application's main event loop and block until exit
+    // execute the application's main event loop and block until exit
     return app.exec();
 }

@@ -1,9 +1,10 @@
 /**
  * @file write_file_action.cpp
- * @brief Implementation of the write file tool.
+ * @brief Implementation of the local file writing tool.
  *
- * Physically writes the agent's generated code or text to the local disk,
- * ensuring the operation succeeds and returning the system feedback.
+ * Safely writes or overwrites text payloads to disk, ensuring that 
+ * intermediate directory structures are automatically created if they 
+ * do not already exist.
  */
 
 #include "write_file_action.h"
@@ -13,37 +14,56 @@
 #include <QDir>
 #include <QFileInfo>
 
+// ============================================================================
+// constructor
+// ============================================================================
+
 WriteFileAction::WriteFileAction(QObject* parent) : BaseAgentAction(parent) {}
+
+// ============================================================================
+// public interface
+// ============================================================================
 
 QString WriteFileAction::getName() const {
     return "write_file";
 }
 
-void WriteFileAction::execute(const AgentCommand& command, const QString& workspacePath) {
-    // command.target already contains the absolute, verified path from the ui routing
-    QString targetPath = command.target;
-    QString content = command.payload;
+// ============================================================================
+// execution logic
+// ============================================================================
 
-    // ensure the parent directories exist before attempting to write the file
+void WriteFileAction::execute(const AgentCommand& command, const QString& workspacePath) {
+    Q_UNUSED(workspacePath); 
+
+    QString targetPath = command.target;
+    QString fileContent = command.payload;
+
+    if (targetPath.isEmpty()) {
+        emit actionFinished("System Error [write_file]: Target path is empty.");
+        return;
+    }
+
     QFileInfo fileInfo(targetPath);
     QDir dir = fileInfo.absoluteDir();
+
+    // create parent directories if they do not exist
     if (!dir.exists()) {
-        dir.mkpath(".");
+        if (!dir.mkpath(".")) {
+            emit actionFinished(QString("System Error [write_file]: Could not create directory structure for %1.").arg(targetPath));
+            return;
+        }
     }
 
     QFile file(targetPath);
     
-    // open the file in write-only text mode, truncating any existing content
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        emit actionFinished("[system error: failed to open file for writing at " + targetPath + "]");
-        return;
+    // open the file in write-only mode, completely overwriting previous contents
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&file);
+        out << fileContent;
+        file.close();
+
+        emit actionFinished(QString("System [write_file]: Successfully wrote to %1").arg(fileInfo.fileName()));
+    } else {
+        emit actionFinished(QString("System Error [write_file]: Access denied or unable to open %1 for writing.").arg(targetPath));
     }
-
-    // stream the exact payload to the disk
-    QTextStream out(&file);
-    out << content;
-    file.close();
-
-    // notify the core system that the operation completed successfully
-    emit actionFinished("[system success: file written successfully to " + fileInfo.fileName() + "]");
 }

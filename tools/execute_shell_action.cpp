@@ -12,6 +12,11 @@
 #include <QProcessEnvironment>
 #include <QCoreApplication>
 #include <QDir>
+#include <QProcess>
+
+// ============================================================================
+// constructor and initialization
+// ============================================================================
 
 ExecuteShellAction::ExecuteShellAction(QObject* parent) : BaseAgentAction(parent) {
     agentProcess = new QProcess(this);
@@ -24,6 +29,10 @@ ExecuteShellAction::~ExecuteShellAction() {
     }
 }
 
+// ============================================================================
+// public interface
+// ============================================================================
+
 QString ExecuteShellAction::getName() const {
     return "execute_shell_command";
 }
@@ -31,6 +40,10 @@ QString ExecuteShellAction::getName() const {
 qint64 ExecuteShellAction::getActiveProcessId() const {
     return agentProcess->processId();
 }
+
+// ============================================================================
+// execution logic
+// ============================================================================
 
 void ExecuteShellAction::execute(const AgentCommand& command, const QString& workspacePath) {
     // terminate previous long-running tasks before starting a new one
@@ -49,7 +62,7 @@ void ExecuteShellAction::execute(const AgentCommand& command, const QString& wor
     
     QString appDir = QCoreApplication::applicationDirPath();
     
-    // Build native paths to our bundled tools
+    // build native paths to our bundled tools
     QString mingwPath = QDir::toNativeSeparators(QDir(appDir).filePath("runtimes/mingw/bin"));
     QString pythonPath = QDir::toNativeSeparators(QDir(appDir).filePath("runtimes/python"));
     QString nodePath = QDir::toNativeSeparators(QDir(appDir).filePath("runtimes/node"));

@@ -8,6 +8,10 @@
 
 #include "agent_prompt_builder.h"
 
+// ============================================================================
+// prompt generation
+// ============================================================================
+
 QString AgentPromptBuilder::buildSystemInstruction(const QString& workspacePath) {
     return QString(
         "System Configuration: You are an autonomous local coding agent running inside a secure Qt C++ wrapper.\n"

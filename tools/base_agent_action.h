@@ -1,10 +1,10 @@
 /**
  * @file base_agent_action.h
- * @brief Defines the abstract base class for all local agent tools.
+ * @brief Abstract base class for all agent execution tools.
  *
- * This file establishes the Command Pattern interface for agent capabilities.
- * By inheriting from this class, individual tools (like writing files or 
- * uploading via FTP) can be entirely decoupled from the core UI and networking logic.
+ * This file defines the command data structure and the polymorphic 
+ * interface used by the action manager to route native requests safely 
+ * to their isolated capability classes.
  */
 
 #ifndef BASE_AGENT_ACTION_H
@@ -13,50 +13,62 @@
 #include <QObject>
 #include <QString>
 
+// ============================================================================
+// data structures
+// ============================================================================
+
 /**
- * @brief Data structure representing a tool execution request from the LLM.
+ * @brief Data structure representing a fully parsed tool execution request.
  */
 struct AgentCommand {
-    QString action;   ///< The name of the tool/function to execute (e.g., "write_file")
-    QString target;   ///< The file path, URL, or terminal command string
-    QString payload;  ///< Optional data payload (e.g., file contents to write, JSON args)
-    QString rationale; ///< The reason for executing this tool
+    QString action;     ///< the strict string identifier of the requested tool
+    QString target;     ///< the primary argument (e.g., file path, shell command)
+    QString payload;    ///< the secondary argument (e.g., file contents, json payload)
+    QString rationale;  ///< the model's reasoning for executing this tool
 };
+
+// ============================================================================
+// interface definition
+// ============================================================================
 
 class BaseAgentAction : public QObject {
     Q_OBJECT
 
 public:
     /**
-     * @brief Constructs the base action.
-     * @param parent The parent QObject, necessary for memory management.
+     * @brief Constructs the base agent action.
+     * @param parent The parent QObject, typically the agent manager.
      */
     explicit BaseAgentAction(QObject* parent = nullptr) : QObject(parent) {}
-
+    
     /**
-     * @brief Virtual destructor to ensure proper cleanup of derived classes.
+     * @brief Virtual destructor to ensure safe cleanup of derived action classes.
      */
     virtual ~BaseAgentAction() = default;
 
     /**
-     * @brief Retrieves the string identifier for this tool.
+     * @brief Retrieves the strict string identifier of the tool.
      * @return The exact function name expected by the LLM (e.g., "write_file").
      */
-    [[nodiscard]] virtual QString getName() const = 0;
+    virtual QString getName() const = 0;
 
     /**
-     * @brief Executes the specific tool logic.
-     * @param command The parsed arguments requested by the agent.
+     * @brief Executes the native action using the provided arguments.
+     * @param command The fully parsed execution request.
      * @param workspacePath The absolute path to the active sandboxed directory.
      */
     virtual void execute(const AgentCommand& command, const QString& workspacePath) = 0;
 
 signals:
+    // ============================================================================
+    // execution callbacks
+    // ============================================================================
+
     /**
-     * @brief Emitted when the tool finishes executing, whether synchronously or asynchronously.
-     * @param systemFeedback The stdout, stderr, or system confirmation string to send back to the LLM.
+     * @brief Emitted when the tool finishes execution (success or failure).
+     * @param result The formatted standard output, standard error, or system confirmation.
      */
-    void actionFinished(const QString& systemFeedback);
+    void actionFinished(const QString& result);
 };
 
 #endif // BASE_AGENT_ACTION_H

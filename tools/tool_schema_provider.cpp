@@ -2,137 +2,106 @@
  * @file tool_schema_provider.cpp
  * @brief Implementation of the tool schema provider.
  *
- * Constructs and returns the static, multi-tool JSON array that informs 
- * the LLM of its autonomous capabilities and their exact parameters.
+ * Hardcodes the schemas for all local actions. ensures that parameters 
+ * perfectly match the arguments expected by the agent action manager.
  */
 
 #include "tool_schema_provider.h"
 
 #include <QJsonObject>
+#include <QJsonArray>
+
+// ============================================================================
+// schema generation
+// ============================================================================
 
 QJsonArray ToolSchemaProvider::getAvailableTools() {
     QJsonArray toolsArray;
+    QJsonArray functionDeclarations;
 
-    QJsonObject rationaleObj; 
-    rationaleObj["type"] = "STRING"; 
-    rationaleObj["description"] = "A short explanation of WHY you are using this tool, to be shown to the user for approval.";
+    // helper lambda to keep the schema construction readable
+    auto addFunction = [&](const QString& name, const QString& description, const QJsonObject& properties, const QJsonArray& requiredParams) {
+        QJsonObject funcDecl;
+        funcDecl["name"] = name;
+        funcDecl["description"] = description;
 
-    // --- tool 1: write_file ---
-    QJsonObject wfPayload; wfPayload["type"] = "STRING"; wfPayload["description"] = "The exact text content to write.";
-    QJsonObject wfTarget; wfTarget["type"] = "STRING"; wfTarget["description"] = "Relative file path (e.g., src/main.cpp).";
-    QJsonObject wfProps; wfProps["payload"] = wfPayload; wfProps["target"] = wfTarget; wfProps["rationale"] = rationaleObj;
-    QJsonArray wfReq; wfReq.append("target"); wfReq.append("payload"); wfReq.append("rationale");
-    QJsonObject wfParams; wfParams["type"] = "OBJECT"; wfParams["properties"] = wfProps; wfParams["required"] = wfReq;
-    
-    QJsonObject writeFileTool;
-    writeFileTool["type"] = "function"; 
-    writeFileTool["name"] = "write_file";
-    writeFileTool["description"] = "Writes content to a local file in the workspace.";
-    writeFileTool["parameters"] = wfParams;
-    toolsArray.append(writeFileTool);
+        QJsonObject parameters;
+        parameters["type"] = "OBJECT";
+        parameters["properties"] = properties;
+        
+        // every tool must enforce its required parameters
+        QJsonArray required = requiredParams;
+        required.append("rationale"); // uniformly demand reasoning
+        parameters["required"] = required;
 
-    // --- tool 2: read_file ---
-    QJsonObject rfTarget; rfTarget["type"] = "STRING"; rfTarget["description"] = "Relative file path to read (e.g., CMakeLists.txt).";
-    QJsonObject rfProps; rfProps["target"] = rfTarget; rfProps["rationale"] = rationaleObj;
-    QJsonArray rfReq; rfReq.append("target"); rfReq.append("rationale");
-    QJsonObject rfParams; rfParams["type"] = "OBJECT"; rfParams["properties"] = rfProps; rfParams["required"] = rfReq;
+        funcDecl["parameters"] = parameters;
+        functionDeclarations.append(funcDecl);
+    };
 
-    QJsonObject readFileTool;
-    readFileTool["type"] = "function"; 
-    readFileTool["name"] = "read_file";
-    readFileTool["description"] = "Reads and returns the exact text content of a local file.";
-    readFileTool["parameters"] = rfParams;
-    toolsArray.append(readFileTool);
+    // --- tool: write_file ---
+    QJsonObject writeProps;
+    writeProps["target"] = QJsonObject{{"type", "STRING"}, {"description", "relative path to the file."}};
+    writeProps["payload"] = QJsonObject{{"type", "STRING"}, {"description", "the complete text or code payload."}};
+    writeProps["rationale"] = QJsonObject{{"type", "STRING"}, {"description", "why this file is being created or modified."}};
+    addFunction("write_file", "creates or completely overwrites a file.", writeProps, {"target", "payload"});
 
-    // --- tool 3: list_directory ---
-    QJsonObject ldTarget; ldTarget["type"] = "STRING"; ldTarget["description"] = "Relative directory path to list. Use '.' for the root workspace.";
-    QJsonObject ldProps; ldProps["target"] = ldTarget; ldProps["rationale"] = rationaleObj;
-    QJsonArray ldReq; ldReq.append("target"); ldReq.append("rationale");
-    QJsonObject ldParams; ldParams["type"] = "OBJECT"; ldParams["properties"] = ldProps; ldParams["required"] = ldReq;
+    // --- tool: read_file ---
+    QJsonObject readProps;
+    readProps["target"] = QJsonObject{{"type", "STRING"}, {"description", "relative path to the file to read."}};
+    readProps["rationale"] = QJsonObject{{"type", "STRING"}, {"description", "why this file needs to be read."}};
+    addFunction("read_file", "reads the contents of a local file.", readProps, {"target"});
 
-    QJsonObject listDirTool;
-    listDirTool["type"] = "function"; 
-    listDirTool["name"] = "list_directory";
-    listDirTool["description"] = "Lists all files and folders in a specified directory.";
-    listDirTool["parameters"] = ldParams;
-    toolsArray.append(listDirTool);
+    // --- tool: list_directory ---
+    QJsonObject listProps;
+    listProps["target"] = QJsonObject{{"type", "STRING"}, {"description", "relative path to the directory (use '.' for root)."}};
+    listProps["rationale"] = QJsonObject{{"type", "STRING"}, {"description", "why you are inspecting this directory."}};
+    addFunction("list_directory", "lists all files and folders in a directory.", listProps, {"target"});
 
-    // --- tool 4: execute_shell_command ---
-    QJsonObject escCommand; escCommand["type"] = "STRING"; escCommand["description"] = "The terminal/shell command to execute (e.g., 'git status', 'cmake --build .', 'npm run test').";
-    QJsonObject escProps; escProps["command"] = escCommand; escProps["rationale"] = rationaleObj;
-    QJsonArray escReq; escReq.append("command"); escReq.append("rationale");
-    QJsonObject escParams; escParams["type"] = "OBJECT"; escParams["properties"] = escProps; escParams["required"] = escReq;
+    // --- tool: execute_shell_command ---
+    QJsonObject shellProps;
+    shellProps["command"] = QJsonObject{{"type", "STRING"}, {"description", "the terminal command to run."}};
+    shellProps["rationale"] = QJsonObject{{"type", "STRING"}, {"description", "why you are running this command."}};
+    addFunction("execute_shell_command", "executes a background terminal command (cmd.exe or /bin/sh).", shellProps, {"command"});
 
-    QJsonObject executeShellTool;
-    executeShellTool["type"] = "function"; 
-    executeShellTool["name"] = "execute_shell_command";
-    executeShellTool["description"] = "Executes a shell/terminal command in the workspace and returns the console output (stdout/stderr).";
-    executeShellTool["parameters"] = escParams;
-    toolsArray.append(executeShellTool);
+    // --- tool: git_manager ---
+    QJsonObject gitProps;
+    QJsonObject itemsObj;
+    itemsObj["type"] = "STRING";
+    QJsonObject blockObj;
+    blockObj["type"] = "ARRAY";
+    blockObj["items"] = itemsObj;
+    gitProps["command_blocks"] = QJsonObject{
+        {"type", "ARRAY"}, 
+        {"description", "a 2d array of git commands. e.g., [['add', '.'], ['commit', '-m', 'msg']]"}, 
+        {"items", blockObj}
+    };
+    gitProps["rationale"] = QJsonObject{{"type", "STRING"}, {"description", "why these version control changes are being made."}};
+    addFunction("git_manager", "executes a batch of git operations sequentially.", gitProps, {"command_blocks"});
 
-    // --- tool 5: upload_ftp ---
-    QJsonObject ftpLocal; ftpLocal["type"] = "STRING"; ftpLocal["description"] = "Relative path of the local file to upload (e.g., index.html).";
-    QJsonObject ftpRemote; ftpRemote["type"] = "STRING"; ftpRemote["description"] = "The destination path and filename on the FTP server (e.g., /public_html/index.html).";
-    QJsonObject ftpProps; ftpProps["local_path"] = ftpLocal; ftpProps["remote_path"] = ftpRemote; ftpProps["rationale"] = rationaleObj;
-    QJsonArray ftpReq; ftpReq.append("local_path"); ftpReq.append("remote_path"); ftpReq.append("rationale");
-    QJsonObject ftpParams; ftpParams["type"] = "OBJECT"; ftpParams["properties"] = ftpProps; ftpParams["required"] = ftpReq;
+    // --- tool: upload_ftp ---
+    QJsonObject ftpProps;
+    ftpProps["local_path"] = QJsonObject{{"type", "STRING"}, {"description", "relative path to the local file to upload."}};
+    ftpProps["remote_url"] = QJsonObject{{"type", "STRING"}, {"description", "optional: remote ftp url. leave blank to use global settings."}};
+    ftpProps["username"] = QJsonObject{{"type", "STRING"}, {"description", "optional: ftp username."}};
+    ftpProps["password"] = QJsonObject{{"type", "STRING"}, {"description", "optional: ftp password."}};
+    ftpProps["rationale"] = QJsonObject{{"type", "STRING"}, {"description", "why this file is being deployed."}};
+    addFunction("upload_ftp", "uploads a single file to a remote ftp server.", ftpProps, {"local_path"});
 
-    QJsonObject uploadFtpTool;
-    uploadFtpTool["type"] = "function"; 
-    uploadFtpTool["name"] = "upload_ftp";
-    uploadFtpTool["description"] = "Uploads a local file to the live FTP server configured in the user settings.";
-    uploadFtpTool["parameters"] = ftpParams;
-    toolsArray.append(uploadFtpTool);
+    // --- tool: fetch_webpage ---
+    QJsonObject webProps;
+    webProps["url"] = QJsonObject{{"type", "STRING"}, {"description", "the full http/https url to fetch."}};
+    webProps["rationale"] = QJsonObject{{"type", "STRING"}, {"description", "why you need the html source of this page."}};
+    addFunction("fetch_webpage", "fetches the raw html source code from a web url.", webProps, {"url"});
 
-    // --- tool 6: fetch_webpage ---
-    QJsonObject fwUrl; fwUrl["type"] = "STRING"; fwUrl["description"] = "The full HTTP/HTTPS URL of the webpage to fetch (e.g., https://my-test-site.com/index.html).";
-    QJsonObject fwProps; fwProps["url"] = fwUrl; fwProps["rationale"] = rationaleObj;
-    QJsonArray fwReq; fwReq.append("url"); fwReq.append("rationale");
-    QJsonObject fwParams; fwParams["type"] = "OBJECT"; fwParams["properties"] = fwProps; fwParams["required"] = fwReq;
+    // --- tool: take_screenshot ---
+    QJsonObject screenProps;
+    screenProps["rationale"] = QJsonObject{{"type", "STRING"}, {"description", "why you need visual verification right now."}};
+    addFunction("take_screenshot", "captures an image of the primary display to verify gui execution.", screenProps, {});
 
-    QJsonObject fetchWebpageTool;
-    fetchWebpageTool["type"] = "function"; 
-    fetchWebpageTool["name"] = "fetch_webpage";
-    fetchWebpageTool["description"] = "Fetches the raw HTML/text content of a live webpage. Useful for verifying deployments.";
-    fetchWebpageTool["parameters"] = fwParams;
-    toolsArray.append(fetchWebpageTool);
-
-    // --- tool 7: take_screenshot ---
-    QJsonObject tsParams; tsParams["type"] = "OBJECT"; tsParams["properties"] = QJsonObject(); 
-    
-    QJsonObject screenshotTool;
-    screenshotTool["type"] = "function"; 
-    screenshotTool["name"] = "take_screenshot";
-    screenshotTool["description"] = "Takes a screenshot of the active GUI application you just executed to visually verify the UI layout or read errors.";
-    screenshotTool["parameters"] = tsParams;
-    toolsArray.append(screenshotTool);
-
-    // --- tool: git_manager (BATCH EDITION) ---
-    QJsonObject gmInnerItems; gmInnerItems["type"] = "STRING";
-    QJsonObject gmOuterItems; gmOuterItems["type"] = "ARRAY"; gmOuterItems["items"] = gmInnerItems;
-    
-    QJsonObject gmBatches; gmBatches["type"] = "ARRAY"; 
-    gmBatches["description"] = "A list of git commands to execute sequentially as a batch. Each command is an array of arguments. Example: [ ['add', '.'], ['commit', '-m', 'Init'], ['status'] ]";
-    gmBatches["items"] = gmOuterItems;
-    
-    QJsonObject gmProps; 
-    gmProps["command_blocks"] = gmBatches;
-    gmProps["rationale"] = rationaleObj; // Don't forget the rationale!
-    
-    QJsonArray gmReq; 
-    gmReq.append("command_blocks");
-    gmReq.append("rationale");
-    
-    QJsonObject gmParams; gmParams["type"] = "OBJECT"; 
-    gmParams["properties"] = gmProps; 
-    gmParams["required"] = gmReq;
-
-    QJsonObject gitManagerTool;
-    gitManagerTool["type"] = "function"; 
-    gitManagerTool["name"] = "git_manager";
-    gitManagerTool["description"] = "Executes a batch of Git commands sequentially. Use this to group logical git operations (like add + commit + push) into a single execution block.";
-    gitManagerTool["parameters"] = gmParams;
-    toolsArray.append(gitManagerTool);
+    // wrap the definitions in the root tool object required by google
+    QJsonObject functionDeclarationsObj;
+    functionDeclarationsObj["function_declarations"] = functionDeclarations;
+    toolsArray.append(functionDeclarationsObj);
 
     return toolsArray;
 }

@@ -14,6 +14,10 @@
 #include <QDateTime>
 #include <QVariant>
 
+// ============================================================================
+// constructor and initialization
+// ============================================================================
+
 DatabaseManager::DatabaseManager(QObject* parent) : QObject(parent) {
     // initialization is deferred to initializedatabase to handle errors cleanly
 }
@@ -35,27 +39,9 @@ bool DatabaseManager::initializeDatabase() {
     return ensureTablesExist();
 }
 
-bool DatabaseManager::ensureTablesExist() {
-    QSqlQuery query;
-    
-    // build the sessions table
-    bool sessionsOk = query.exec("CREATE TABLE IF NOT EXISTS sessions ("
-                                 "id TEXT PRIMARY KEY, "
-                                 "name TEXT, "
-                                 "workspace TEXT, "
-                                 "created_at INTEGER)");
-
-    // build the interactions table for conversational memory
-    bool interactionsOk = query.exec("CREATE TABLE IF NOT EXISTS interactions ("
-                                     "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                                     "session_id TEXT, "
-                                     "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, "
-                                     "role TEXT, "
-                                     "content TEXT, "
-                                     "api_interaction_id TEXT)");
-
-    return sessionsOk && interactionsOk;
-}
+// ============================================================================
+// session management
+// ============================================================================
 
 QList<SessionData> DatabaseManager::getAllSessions() const {
     QList<SessionData> sessions;
@@ -108,6 +94,10 @@ void DatabaseManager::updateSessionTimestamp(const QString& id) {
     query.exec();
 }
 
+// ============================================================================
+// interaction history
+// ============================================================================
+
 bool DatabaseManager::saveInteraction(const QString& sessionId, const QString& role, const QString& content, const QString& apiInteractionId) {
     QSqlQuery query;
     query.prepare("INSERT INTO interactions (session_id, role, content, api_interaction_id) VALUES (:sid, :role, :content, :api_id)");
@@ -137,4 +127,30 @@ QList<InteractionData> DatabaseManager::getInteractions(const QString& sessionId
     }
     
     return interactions;
+}
+
+// ============================================================================
+// private helper methods
+// ============================================================================
+
+bool DatabaseManager::ensureTablesExist() {
+    QSqlQuery query;
+    
+    // build the sessions table
+    bool sessionsOk = query.exec("CREATE TABLE IF NOT EXISTS sessions ("
+                                 "id TEXT PRIMARY KEY, "
+                                 "name TEXT, "
+                                 "workspace TEXT, "
+                                 "created_at INTEGER)");
+
+    // build the interactions table for conversational memory
+    bool interactionsOk = query.exec("CREATE TABLE IF NOT EXISTS interactions ("
+                                     "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                     "session_id TEXT, "
+                                     "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                                     "role TEXT, "
+                                     "content TEXT, "
+                                     "api_interaction_id TEXT)");
+
+    return sessionsOk && interactionsOk;
 }

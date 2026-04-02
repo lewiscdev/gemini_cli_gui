@@ -1,10 +1,10 @@
 /**
  * @file main_window.cpp
- * @brief Implementation of the primary GUI and agent orchestration logic.
+ * @brief implementation of the primary gui and agent orchestration logic.
  *
- * This file handles UI rendering, multi-modal drag-and-drop, and API routing.
- * All complex agent actions (like shell execution, FTP uploads, and screenshots) 
- * are entirely offloaded to the isolated Command Pattern action classes.
+ * this file handles ui rendering, multi-modal drag-and-drop, and api routing.
+ * all complex agent actions (like shell execution, ftp uploads, and screenshots) 
+ * are entirely offloaded to the isolated command pattern action classes.
  */
 
 #include "main_window.h"
@@ -35,6 +35,10 @@
 #include <QClipboard>
 #include <QKeyEvent>
 
+// ============================================================================
+// constructor and initialization
+// ============================================================================
+
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setupUi();
     applyTheme();
@@ -57,7 +61,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // draw the ui immediately so modal dialogs float correctly over the application
     this->show(); 
 
-    // --- global settings check ---
+    // global settings check
     QSettings settings;
     QString storedKey = settings.value("api_key", "").toString();
 
@@ -74,7 +78,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     }
     apiClient->setApiKey(storedKey);
 
-    // --- session manager launch ---
+    // session manager launch
     SessionDialog sessionDlg(dbManager, this);
     if (sessionDlg.exec() != QDialog::Accepted) {
         chatDisplay->append("<span style=\"color: red;\">Error: No session selected. Please restart.</span>");
@@ -121,7 +125,9 @@ void MainWindow::setupUi() {
 
     chatDisplay = new QTextBrowser(this);
     chatDisplay->setReadOnly(true);
-    chatDisplay->setOpenLinks(false); // We must disable auto-open so we can intercept the copy click!
+    
+    // we must disable auto-open so we can intercept the copy click
+    chatDisplay->setOpenLinks(false); 
 
     tokenDisplayLabel = new QLabel("Tokens: 0 In | 0 Out", this);
     tokenDisplayLabel->setAlignment(Qt::AlignRight);
@@ -149,21 +155,24 @@ void MainWindow::setupUi() {
 
     inputField = new QTextEdit(this);
     inputField->setPlaceholderText("Enter command (Shift+Enter for newline), or drag and drop files here...");
-    inputField->setMaximumHeight(80); // Prevent the box from taking up the whole screen
-    inputField->installEventFilter(this); // Tell Qt to funnel keypresses to our interceptor
+    
+    // prevent the box from taking up the whole screen
+    inputField->setMaximumHeight(80); 
+    
+    // tell qt to funnel keypresses to our interceptor
+    inputField->installEventFilter(this); 
 
     sendButton = new QPushButton("Send", this);
 
-    // 1. Tell both buttons to stretch vertically
+    // tell both buttons to stretch vertically
     btnAttach->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
     sendButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
 
-    // 2. THE HARD CEILING: Force them to stop growing at the exact same height as the text box
-    // (Assuming your inputField->setMaximumHeight() is set to 80)
+    // the hard ceiling: force them to stop growing at the exact same height as the text box
     btnAttach->setMaximumHeight(80); 
     sendButton->setMaximumHeight(80);
 
-    // 3. Add them directly side-by-side
+    // add them directly side-by-side
     inputLayout->addWidget(btnAttach);
     inputLayout->addWidget(inputField);
     inputLayout->addWidget(sendButton);
@@ -199,7 +208,7 @@ void MainWindow::initializeConnections() {
 }
 
 // ============================================================================
-// DATABASE HELPER PROXIES
+// database helper proxies
 // ============================================================================
 
 void MainWindow::saveInteractionToDb(const QString& role, const QString& content, const QString& apiInteractionId) {
@@ -212,7 +221,7 @@ bool MainWindow::loadHistoryFromDb() {
 
     QString lastInteractionId;
 
-    // Grab the cursor so we can inject raw text to preserve \n for the syntax engine
+    // grab the cursor so we can inject raw text to preserve \n for the syntax engine
     QTextCursor cursor = chatDisplay->textCursor();
 
     for (const InteractionData& data : history) {
@@ -222,7 +231,7 @@ bool MainWindow::loadHistoryFromDb() {
 
     chatDisplay->ensureCursorVisible();
 
-    // Pass the state token back to the API client so the LLM remembers the context
+    // pass the state token back to the api client so the llm remembers the context
     if (!lastInteractionId.isEmpty()) {
         apiClient->restoreSession(lastInteractionId);
     }
@@ -263,9 +272,10 @@ void MainWindow::openSettings() {
         QSettings settings;
         apiClient->setApiKey(settings.value("api_key").toString());
         
-        applyTheme(); // Apply new colors immediately
+        // apply new colors immediately
+        applyTheme(); 
         
-        // Redraw the chat history with the new HTML bubbles!
+        // redraw the chat history with the new html bubbles
         chatDisplay->clear();
         loadHistoryFromDb();
         
@@ -274,11 +284,11 @@ void MainWindow::openSettings() {
 }
 
 // ============================================================================
-// MULTI-MODAL & USER INPUT
+// multi-modal & user input
 // ============================================================================
 
 void MainWindow::handleSendClicked() {
-    // Upgrade from text() to toPlainText() for the new QTextEdit
+    // upgrade from text() to toplaintext() for the new qtextedit
     QString userInput = inputField->toPlainText().trimmed(); 
     
     if (!userInput.isEmpty() || !pendingAttachments.isEmpty()) {
@@ -343,7 +353,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
 }
 
 // ============================================================================
-// API CALLBACKS
+// api callbacks
 // ============================================================================
 
 void MainWindow::onResponseReceived(const QString& responseText, const QString& interactionId) {
@@ -378,18 +388,19 @@ void MainWindow::handleNativeFunctionCalls(const QJsonArray& toolCalls) {
         saveInteractionToDb("system", finalFeedback);
         QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
         
-        // --- ATTACHMENT PIPELINE INJECTION ---
+        // attachment pipeline injection
         QStringList systemAttachments;
         QString screenshotPath = QDir(currentWorkspacePath).absoluteFilePath("latest_agent_screenshot.png");
         
         if (QFile::exists(screenshotPath)) {
-            systemAttachments.append(screenshotPath); // Add the image!
+            // add the image
+            systemAttachments.append(screenshotPath); 
         }
 
-        // Send the batch response WITH the attachments
+        // send the batch response with the attachments
         apiClient->sendPrompt(history, finalFeedback, systemAttachments);
 
-        // Clean up the image
+        // clean up the image
         if (QFile::exists(screenshotPath)) {
             QFile::remove(screenshotPath);
         }
@@ -397,28 +408,28 @@ void MainWindow::handleNativeFunctionCalls(const QJsonArray& toolCalls) {
 }
 
 void MainWindow::onAgentSystemFeedback(const QString& feedback) {
-    // 1. Trap visual fluff: Print it to the UI, but DO NOT send to the API or Database!
+    // trap visual fluff: print it to the ui, but do not send to the api or database
     if (feedback.startsWith("UI_ONLY:")) {
         chatDisplay->append(feedback.mid(8));
         return; 
     }
 
-    // 2. Safely separate the UI rendering from the API payload (No dangerous Regex!)
+    // safely separate the ui rendering from the api payload (no dangerous regex)
     QString displayFeedback = feedback;
     QString apiFeedback = feedback;
 
     if (feedback.contains("Visual verification captured.")) {
         int splitIndex = feedback.indexOf("<br><br><img");
         if (splitIndex != -1) {
-            // Strip the HTML image tag for the API, but keep it for the UI display
+            // strip the html image tag for the api, but keep it for the ui display
             apiFeedback = feedback.left(splitIndex) + " [Screenshot Attached to Payload]";
         }
     }
 
-    // 3. Draw the system bubble in the UI
+    // draw the system bubble in the ui
     chatDisplay->append(formatChatBubble("system", displayFeedback, isDarkTheme));
 
-    // 4. Send the clean API data back to Gemini
+    // send the clean api data back to gemini
     if (isBatchProcessing) {
         batchSystemFeedback += apiFeedback + "\n\n";
     } else {
@@ -441,7 +452,7 @@ void MainWindow::onAgentSystemFeedback(const QString& feedback) {
 }
 
 // ============================================================================
-// HARDWARE INTERCEPTS (KEYBOARD & CLIPBOARD)
+// hardware intercepts (keyboard & clipboard)
 // ============================================================================
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
@@ -450,10 +461,13 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
         
         if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
             if (keyEvent->modifiers() & Qt::ShiftModifier) {
-                return false; // Let the QTextEdit naturally insert a newline
+                // let the qtextedit naturally insert a newline
+                return false; 
             } else {
-                handleSendClicked(); // Fire the prompt
-                return true; // Consume the event so it doesn't drop a random newline
+                // fire the prompt
+                handleSendClicked(); 
+                // consume the event so it doesn't drop a random newline
+                return true; 
             }
         }
     }
@@ -461,34 +475,36 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
 }
 
 void MainWindow::handleAnchorClicked(const QUrl& url) {
-    // Check if it's our hidden copy scheme
+    // check if it's our hidden copy scheme
     if (url.scheme() == "copy") {
-        // Strip the "copy:" prefix
+        // strip the "copy:" prefix
         QString payload = url.toString().mid(5); 
         
-        // Decode the URL-safe Base64 string back into raw C++/Python
+        // decode the url-safe base64 string back into raw c++/python
         QByteArray decodedCode = QByteArray::fromBase64(payload.toUtf8(), QByteArray::Base64UrlEncoding);
         
-        // Push straight to OS clipboard
+        // push straight to os clipboard
         QApplication::clipboard()->setText(QString::fromUtf8(decodedCode));
         
-        // Brief visual feedback
+        // brief visual feedback
         QMessageBox::information(this, "Copied", "Code block copied to clipboard!");
     }
 }
 
 // ============================================================================
-// THEME & UI RENDERING ENGINE
+// theme & ui rendering engine
 // ============================================================================
 
 void MainWindow::applyTheme() {
     bool dark = ThemeManager::isDark();
-    this->isDarkTheme = dark; // Update your bool for the ChatFormatter
     
-    // Apply the global app style
+    // update internal bool for the chatformatter
+    this->isDarkTheme = dark; 
+    
+    // apply the global app style
     this->setStyleSheet(ThemeManager::getStyleSheet(dark));
     
-    // Specifically fix the chat display's viewport background
+    // specifically fix the chat display's viewport background
     QPalette p = chatDisplay->palette();
     p.setColor(QPalette::Base, dark ? QColor("#0F172A") : QColor("#F8FAFC"));
     p.setColor(QPalette::Text, dark ? QColor("#F8FAFC") : QColor("#0F172A"));
@@ -500,7 +516,7 @@ QString MainWindow::formatChatBubble(const QString& role, const QString& content
     QString textColor;
     QString borderColor;
     
-    // 1. Define a high-contrast palette
+    // define a high-contrast palette
     if (isDark) {
         bubbleBg = (role == "user") ? "#334155" : "#020617"; 
         borderColor = "#475569"; 
@@ -514,13 +530,14 @@ QString MainWindow::formatChatBubble(const QString& role, const QString& content
     QString name = (role == "user") ? "You" : "Agent";
     QString parsedContent = ChatFormatter::formatMarkdownToHtml(content, isDark);
 
-    // 2. The Unified Table Structure
+    // the unified table structure
     QString html = "<table width=\"100%\" cellspacing=\"10\" cellpadding=\"0\"><tr>";
     
     QString bubbleStyle = QString("background-color: %1; border: 1px solid %2;").arg(bubbleBg, borderColor);
 
     if (role == "user") {
-        html += "<td width=\"20%\"></td>"; // Push Right
+        // push right
+        html += "<td width=\"20%\"></td>"; 
         html += QString("<td width=\"80%\" style=\"%1\">"
                         "<table width=\"100%\" cellpadding=\"14\" cellspacing=\"0\">"
                         "<tr><td style=\"color: %2;\"><b>%3</b><br><br>%4</td></tr>"
@@ -530,14 +547,15 @@ QString MainWindow::formatChatBubble(const QString& role, const QString& content
                         "<table width=\"100%\" cellpadding=\"14\" cellspacing=\"0\">"
                         "<tr><td style=\"color: %2;\"><b>%3</b><br><br>%4</td></tr>"
                         "</table></td>").arg(bubbleStyle, textColor, name, parsedContent);
-        html += "<td width=\"20%\"></td>"; // Push Left
+        // push left
+        html += "<td width=\"20%\"></td>"; 
     } else {
-        // --- THE NEW SYSTEM BAR ---
+        // the new system bar
         QString barBg = isDark ? "#1E293B" : "#F8FAFC";
         QString barBorder = isDark ? "#334155" : "#E2E8F0";
         QString systemColor = isDark ? "#94A3B8" : "#64748B";
         
-        // Use colspan="2" to span the entire chat width evenly
+        // use colspan="2" to span the entire chat width evenly
         html += QString("<td colspan=\"2\" align=\"center\">"
                         "<table width=\"100%\" cellpadding=\"8\" cellspacing=\"0\" style=\"background-color: %1; border: 1px solid %2; border-radius: 6px;\">"
                         "<tr><td align=\"center\" style=\"color: %3; font-size: 11px; font-weight: bold; letter-spacing: 0.5px;\">%4</td></tr>"

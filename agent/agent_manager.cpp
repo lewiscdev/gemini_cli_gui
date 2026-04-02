@@ -28,6 +28,10 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+// ============================================================================
+// constructor and initialization
+// ============================================================================
+
 AgentActionManager::AgentActionManager(QObject* parent) : QObject(parent) {
     registerAction(new WriteFileAction(this));
     registerAction(new FtpUploadAction(this));
@@ -36,10 +40,15 @@ AgentActionManager::AgentActionManager(QObject* parent) : QObject(parent) {
     registerAction(shellAction);
     registerAction(new TakeScreenshotAction(shellAction, this));
     registerAction(new GitManagerAction(this));
+    
     addWhitelistedAction("take_screenshot");
 }
 
 AgentActionManager::~AgentActionManager() {}
+
+// ============================================================================
+// registry and security lists
+// ============================================================================
 
 void AgentActionManager::registerAction(BaseAgentAction* action) {
     if (action) {
@@ -56,6 +65,10 @@ bool AgentActionManager::isActionWhitelisted(const QString& action) const {
     return whitelistedActions.contains(action);
 }
 
+// ============================================================================
+// security and path validation
+// ============================================================================
+
 QString AgentActionManager::resolveAndVerifyPath(const QString& relativeTarget, const QString& workspacePath) const {
     if (workspacePath.isEmpty()) return "";
 
@@ -68,6 +81,10 @@ QString AgentActionManager::resolveAndVerifyPath(const QString& relativeTarget, 
     }
     return absolutePath;
 }
+
+// ============================================================================
+// api routing and argument parsing
+// ============================================================================
 
 void AgentActionManager::processFunctionCall(const QString& functionName, const QJsonObject& arguments, const QString& workspacePath) {
     emit cleanTextReady(QString("UI_ONLY:<span style=\"color: orange;\"><i>[Agent requested tool execution: %1]</i></span>").arg(functionName));
@@ -109,7 +126,8 @@ void AgentActionManager::processFunctionCall(const QString& functionName, const 
     else if (functionName == "take_screenshot") {
         command.target = "GUI Application";
     }
-    // --- silent actions (no permission modal required, executed directly) ---
+    
+    // silent actions (no permission modal required, executed directly)
     else if (functionName == "read_file") {
         QString absoluteTarget = resolveAndVerifyPath(arguments["target"].toString(), workspacePath);
         QFile file(absoluteTarget);
@@ -168,6 +186,10 @@ void AgentActionManager::processFunctionCall(const QString& functionName, const 
     }
 }
 
+// ============================================================================
+// human-in-the-loop security
+// ============================================================================
+
 void AgentActionManager::handleSecurityIntercept(const AgentCommand& command, const QString& workspacePath) {
     // cast the parent object to a qwidget so the messagebox centers perfectly over the main ui
     QWidget* parentWidget = qobject_cast<QWidget*>(parent());
@@ -195,6 +217,10 @@ void AgentActionManager::handleSecurityIntercept(const AgentCommand& command, co
         emit cleanTextReady(QString("System Error: User denied permission to execute %1.").arg(command.action));
     }
 }
+
+// ============================================================================
+// tool execution
+// ============================================================================
 
 void AgentActionManager::executeApprovedAction(const AgentCommand& command, const QString& workspacePath) {
     if (registry.contains(command.action)) {

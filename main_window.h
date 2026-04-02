@@ -49,22 +49,82 @@ public:
 
 protected:
     // --- hardware input intercepts ---
+    
+    /**
+     * @brief Intercepts key presses to handle custom shift+enter logic.
+     * @param obj The object that generated the event.
+     * @param event The triggered event.
+     * @return True if the event was handled, false otherwise.
+     */
     bool eventFilter(QObject *obj, QEvent *event) override;
+    
+    /**
+     * @brief Validates dragged objects as they enter the window.
+     * @param event The drag enter event.
+     */
     void dragEnterEvent(QDragEnterEvent *event) override;
+    
+    /**
+     * @brief Processes the files dropped onto the window.
+     * @param event The drop event.
+     */
     void dropEvent(QDropEvent *event) override;
 
 private slots:
     // --- ui interaction slots ---
+    
+    /**
+     * @brief Gathers user input and triggers the api payload submission.
+     */
     void handleSendClicked();
+    
+    /**
+     * @brief Opens a file dialog to manually attach multi-modal files.
+     */
     void attachFiles();
+    
+    /**
+     * @brief Clears all currently pending file attachments.
+     */
     void clearAttachments();
+    
+    /**
+     * @brief Launches the global settings dialog.
+     */
     void openSettings();
+    
+    /**
+     * @brief Launches the session manager to swap active projects.
+     */
     void switchSession();
 
     // --- api routing slots ---
+    
+    /**
+     * @brief Renders the standard text response from the llm.
+     * @param responseText The markdown-formatted response string.
+     * @param interactionId The stateful api tracking id.
+     */
     void onResponseReceived(const QString& responseText, const QString& interactionId);
+    
+    /**
+     * @brief Displays network or parsing errors to the user.
+     * @param errorDetails The specific error string.
+     */
     void onNetworkError(const QString& errorDetails);
+    
+    /**
+     * @brief Updates the ui token consumption counters.
+     * @param inputTokens The number of prompt tokens.
+     * @param outputTokens The number of generated tokens.
+     * @param totalTokens The sum of both.
+     */
     void onUsageMetricsReceived(int inputTokens, int outputTokens, int totalTokens);
+    
+    /**
+     * @brief Catches batch tool execution requests from the api client.
+     * @param toolCalls The json array of requested native tools.
+     */
     void handleNativeFunctionCalls(const QJsonArray& toolCalls);
     
     /**
@@ -74,40 +134,41 @@ private slots:
     void onAgentSystemFeedback(const QString& feedback);
 
     /**
-     * @brief Intercepts clicks on HTML anchor tags inside the chat display.
+     * @brief Intercepts clicks on html anchor tags inside the chat display.
+     * @param url The clicked url.
      */
     void handleAnchorClicked(const QUrl& url);
 
 private:
     // --- ui elements ---
-    QWidget* centralWidget{nullptr};
-    QVBoxLayout* mainLayout{nullptr};
+    QWidget* centralWidget{nullptr};       ///< the central widget of the main window
+    QVBoxLayout* mainLayout{nullptr};      ///< the primary vertical layout
     
-    QTextBrowser* chatDisplay{nullptr};
-    QTextEdit* inputField{nullptr};
-    QLabel* tokenDisplayLabel{nullptr};
+    QTextBrowser* chatDisplay{nullptr};    ///< renders the html chat history
+    QTextEdit* inputField{nullptr};        ///< handles multi-line user input
+    QLabel* tokenDisplayLabel{nullptr};    ///< displays token consumption metrics
     
-    QLabel* lblAttachments{nullptr};
-    QPushButton* btnClearFiles{nullptr};
-    QPushButton* btnAttach{nullptr};
-    QPushButton* sendButton{nullptr};
+    QLabel* lblAttachments{nullptr};       ///< displays the number of attached files
+    QPushButton* btnClearFiles{nullptr};   ///< button to clear pending attachments
+    QPushButton* btnAttach{nullptr};       ///< button to open the file attachment dialog
+    QPushButton* sendButton{nullptr};      ///< button to submit the prompt
     
-    QPushButton* btnManageSessions{nullptr};
-    QPushButton* btnSettings{nullptr};
+    QPushButton* btnManageSessions{nullptr}; ///< button to launch the session manager
+    QPushButton* btnSettings{nullptr};       ///< button to launch the settings dialog
 
     // --- core subsystems ---
-    GeminiApiClient* apiClient{nullptr};
-    AgentActionManager* agentController{nullptr};
-    DatabaseManager* dbManager{nullptr};   ///< central manager for all sqlite operations
+    GeminiApiClient* apiClient{nullptr};     ///< handles network communication with google
+    AgentActionManager* agentController{nullptr}; ///< routes and executes native tools
+    DatabaseManager* dbManager{nullptr};     ///< central manager for all sqlite operations
 
     // --- session state ---
-    QString currentSessionId;
-    QString currentWorkspacePath;
-    QStringList pendingAttachments;
+    QString currentSessionId;              ///< the uuid of the active sqlite session
+    QString currentWorkspacePath;          ///< the absolute path to the active sandbox
+    QStringList pendingAttachments;        ///< list of files waiting to be sent
 
     // --- batch processing state ---
-    bool isBatchProcessing{false};
-    QString batchSystemFeedback;
+    bool isBatchProcessing{false};         ///< flag indicating if a batch of tools is running
+    QString batchSystemFeedback;           ///< accumulated feedback buffer for batch operations
 
     // --- internal helper methods ---
     
@@ -128,6 +189,9 @@ private:
 
     /**
      * @brief Saves a single chat interaction via the database manager.
+     * @param role The entity that spoke (e.g., user, model, system).
+     * @param content The text payload of the message.
+     * @param apiInteractionId The stateful tracking id for the api context.
      */
     void saveInteractionToDb(const QString& role, const QString& content, const QString& apiInteractionId = "");
 
@@ -138,16 +202,20 @@ private:
     bool loadHistoryFromDb();
 
     /**
-     * @brief Applies QSS stylesheets and updates internal theme state.
+     * @brief Applies qss stylesheets and updates internal theme state.
      */
     void applyTheme();
 
     /**
-     * @brief Wraps parsed HTML in a structural layout table to create chat bubbles.
+     * @brief Wraps parsed html in a structural layout table to create chat bubbles.
+     * @param role The entity that spoke (user, model, system).
+     * @param content The raw or parsed html content.
+     * @param isDark Whether the dark theme is active.
+     * @return The formatted html string.
      */
     QString formatChatBubble(const QString& role, const QString& content, bool isDark);
 
-    bool isDarkTheme{true}; // Tracks global theme state
+    bool isDarkTheme{true}; ///< tracks global theme state
 };
 
 #endif // MAIN_WINDOW_H

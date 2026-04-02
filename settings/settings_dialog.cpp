@@ -20,19 +20,21 @@
 #include <QSettings>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <QComboBox>
 
-/**
- * @brief Constructs the Settings Dialog UI and loads saved credentials.
- */
+// ============================================================================
+// constructor and initialization
+// ============================================================================
+
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     setWindowTitle("Global Settings");
     setMinimumWidth(450);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    // ========================================================================
-    // SECTION 1: API CREDENTIALS
-    // ========================================================================
+    // ============================================================================
+    // api credentials section
+    // ============================================================================
     QGroupBox* apiGroup = new QGroupBox("API Credentials", this);
     QFormLayout* apiLayout = new QFormLayout(apiGroup);
 
@@ -49,19 +51,19 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     
     mainLayout->addWidget(apiGroup);
 
-    // ========================================================================
-    // SECTION 2: FTP DEPLOYMENT CONFIGURATION
-    // ========================================================================
+    // ============================================================================
+    // ftp deployment section
+    // ============================================================================
     QGroupBox* ftpGroup = new QGroupBox("Default FTP Deployment (Optional)", this);
     QFormLayout* ftpLayout = new QFormLayout(ftpGroup);
 
     ftpHostInput = new QLineEdit(this);
     ftpHostInput->setPlaceholderText("ftp.yourdomain.com");
 
-    // Use a SpinBox to ensure the user can only enter valid network ports
+    // use a spinbox to ensure the user can only enter valid network ports
     ftpPortInput = new QSpinBox(this);
     ftpPortInput->setRange(1, 65535);
-    ftpPortInput->setValue(21); // Default standard FTP port
+    ftpPortInput->setValue(21); 
 
     ftpUsernameInput = new QLineEdit(this);
     ftpUsernameInput->setPlaceholderText("username");
@@ -77,9 +79,9 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
 
     mainLayout->addWidget(ftpGroup);
 
-    // ========================================================================
-    // UI APPEARANCE
-    // ========================================================================
+    // ============================================================================
+    // appearance section
+    // ============================================================================
     QGroupBox* uiGroup = new QGroupBox("Appearance", this);
     QFormLayout* uiLayout = new QFormLayout(uiGroup);
     
@@ -90,9 +92,9 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     
     mainLayout->addWidget(uiGroup);
     
-    // ========================================================================
-    // DIALOG CONTROLS & INITIALIZATION
-    // ========================================================================
+    // ============================================================================
+    // dialog controls
+    // ============================================================================
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     QPushButton* btnSave = new QPushButton("Save", this);
     QPushButton* btnCancel = new QPushButton("Cancel", this);
@@ -103,7 +105,7 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     
     mainLayout->addLayout(buttonLayout);
 
-    // --- Initialize from OS Registry/Settings ---
+    // initialize from os registry/settings
     QSettings settings;
     apiKeyInput->setText(settings.value("api_key", "").toString());
     githubPatInput->setText(settings.value("github_pat", "").toString());
@@ -113,25 +115,26 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     ftpUsernameInput->setText(settings.value("ftp_username", "").toString());
     ftpPasswordInput->setText(settings.value("ftp_password", "").toString());
 
-    // Load theme
+    // load theme
     QString savedTheme = settings.value("theme", "dark").toString();
     int index = themeSelector->findData(savedTheme);
     if (index != -1) themeSelector->setCurrentIndex(index);
 
-    // --- Connections ---
+    // wire connections
     connect(btnSave, &QPushButton::clicked, this, &SettingsDialog::saveSettings);
     connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
 
     ThemeManager::apply(this);
 }
 
-/**
- * @brief Saves the inputs to QSettings and closes the dialog.
- */
+// ============================================================================
+// save handler
+// ============================================================================
+
 void SettingsDialog::saveSettings() {
     QString apiKey = apiKeyInput->text().trimmed();
     
-    // Validate that the core API key is actually provided to prevent app failure
+    // validate that the core api key is actually provided to prevent app failure
     if (apiKey.isEmpty()) {
         QMessageBox::warning(this, "Validation Error", "The Gemini API Key cannot be empty.");
         return;
@@ -143,17 +146,17 @@ void SettingsDialog::saveSettings() {
     
     settings.setValue("theme", themeSelector->currentData().toString());
 
-    // Save FTP Configs
+    // save ftp configs
     settings.setValue("ftp_host", ftpHostInput->text().trimmed());
     settings.setValue("ftp_port", ftpPortInput->value());
     settings.setValue("ftp_username", ftpUsernameInput->text().trimmed());
-    settings.setValue("ftp_password", ftpPasswordInput->text()); // Passwords can contain leading/trailing spaces, don't trim
+    settings.setValue("ftp_password", ftpPasswordInput->text()); // passwords can contain leading/trailing spaces, don't trim
     
     accept();
 }
 
 // ============================================================================
-// GETTERS
+// public accessors
 // ============================================================================
 
 QString SettingsDialog::getApiKey() const {

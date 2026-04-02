@@ -11,12 +11,18 @@
 #define EXECUTE_SHELL_ACTION_H
 
 #include "base_agent_action.h"
-#include <QProcess>
+
+// forward declarations to reduce header bloat
+class QProcess;
 
 class ExecuteShellAction : public BaseAgentAction {
     Q_OBJECT
 
 public:
+    // ============================================================================
+    // constructor and initialization
+    // ============================================================================
+
     /**
      * @brief Constructs the shell execution action.
      * @param parent The parent QObject.
@@ -27,6 +33,10 @@ public:
      * @brief Safely terminates any persistent shell processes.
      */
     ~ExecuteShellAction() override;
+
+    // ============================================================================
+    // public interface
+    // ============================================================================
 
     /**
      * @brief Returns the strict api identifier for this tool.
@@ -48,6 +58,10 @@ public:
     [[nodiscard]] qint64 getActiveProcessId() const;
 
 private:
+    // ============================================================================
+    // internal state
+    // ============================================================================
+
     QProcess* agentProcess; ///< persistent process to allow background server execution
 };
 

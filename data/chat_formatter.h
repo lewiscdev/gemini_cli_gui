@@ -14,6 +14,10 @@
 
 class ChatFormatter {
 public:
+    // ============================================================================
+    // public formatting methods
+    // ============================================================================
+
     /**
      * @brief Parses raw markdown into rich HTML tables with isolated inline syntax highlighting.
      * @param markdown The raw text from the LLM or Database.
@@ -21,6 +25,12 @@ public:
      */
     [[nodiscard]] static QString formatMarkdownToHtml(const QString& markdown);
 
+    /**
+     * @brief Parses raw markdown into HTML while explicitly applying theme-aware colors.
+     * @param markdown The raw text from the LLM or Database.
+     * @param isDarkTheme True if the dark theme is currently active.
+     * @return A themed, styled HTML string ready for UI rendering.
+     */
     [[nodiscard]] static QString formatMarkdownToHtml(const QString& markdown, bool isDarkTheme);
 };
 

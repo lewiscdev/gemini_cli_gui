@@ -16,7 +16,9 @@
 #include <QMap>
 #include <QJsonObject>
 
-#include "base_agent_action.h"
+// forward declarations to reduce header bloat
+struct AgentCommand;
+class BaseAgentAction;
 
 class AgentActionManager : public QObject {
     Q_OBJECT
@@ -55,7 +57,7 @@ public:
 
 public slots:
     /**
-     * @brief The main gateway for all api tool requests. parses args and triggers security.
+     * @brief The main gateway for all api tool requests. Parses args and triggers security.
      * @param functionName The exact string name of the tool requested by the llm.
      * @param arguments The json payload containing the tool parameters.
      * @param workspacePath The absolute path to the active sandboxed directory.
@@ -70,9 +72,16 @@ signals:
     void cleanTextReady(const QString& text);
 
 private:
+    // ============================================================================
+    // internal state
+    // ============================================================================
     QSet<QString> whitelistedActions;         ///< collection of pre-approved safe actions
     QMap<QString, BaseAgentAction*> registry; ///< dynamic map of registered tool classes
 
+    // ============================================================================
+    // private helper methods
+    // ============================================================================
+    
     /**
      * @brief Internal helper to register a new tool class to the routing engine.
      * @param action Pointer to the instantiated tool class.

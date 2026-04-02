@@ -19,6 +19,10 @@
 #include <QUuid>
 #include <QVBoxLayout>
 
+// ============================================================================
+// constructor and initialization
+// ============================================================================
+
 SessionDialog::SessionDialog(DatabaseManager* db, QWidget* parent) 
     : QDialog(parent), dbManager(db) {
     
@@ -27,11 +31,11 @@ SessionDialog::SessionDialog(DatabaseManager* db, QWidget* parent)
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    // --- session list view ---
+    // initialize the session list view
     sessionList = new QListWidget(this);
     mainLayout->addWidget(sessionList);
 
-    // --- control buttons ---
+    // initialize control buttons
     QHBoxLayout* btnLayout = new QHBoxLayout();
     btnNew = new QPushButton("New Session", this);
     btnDelete = new QPushButton("Delete", this);
@@ -47,7 +51,7 @@ SessionDialog::SessionDialog(DatabaseManager* db, QWidget* parent)
 
     mainLayout->addLayout(btnLayout);
 
-    // --- connections ---
+    // wire up the signal/slot connections
     connect(btnNew, &QPushButton::clicked, this, &SessionDialog::createNewSession);
     connect(btnDelete, &QPushButton::clicked, this, &SessionDialog::deleteSelectedSession);
     connect(btnLoad, &QPushButton::clicked, this, &SessionDialog::selectAndClose);
@@ -57,6 +61,10 @@ SessionDialog::SessionDialog(DatabaseManager* db, QWidget* parent)
 
     ThemeManager::apply(this);
 }
+
+// ============================================================================
+// database operations
+// ============================================================================
 
 void SessionDialog::loadSessionsFromDb() {
     sessionList->clear();
@@ -80,6 +88,10 @@ void SessionDialog::loadSessionsFromDb() {
         sessionList->setCurrentRow(0); 
     }
 }
+
+// ============================================================================
+// ui slot handlers
+// ============================================================================
 
 void SessionDialog::createNewSession() {
     // ask for a project name
@@ -137,6 +149,10 @@ void SessionDialog::selectAndClose() {
     
     accept();
 }
+
+// ============================================================================
+// public accessors
+// ============================================================================
 
 SessionData SessionDialog::getSelectedSession() const {
     return selectedSession;
