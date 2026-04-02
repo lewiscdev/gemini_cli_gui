@@ -44,3 +44,4 @@ test.txt
 *.suo
 .DS_Store
 Thumbs.db
+*.iss
