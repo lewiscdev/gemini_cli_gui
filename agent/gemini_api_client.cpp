@@ -128,6 +128,11 @@ void GeminiApiClient::onNetworkReply(QNetworkReply* reply) {
         }
         return;
     }
+    else if (rootObj.contains("status") && rootObj["status"].toString() == "completed") {
+        // The model successfully thought about the prompt, but decided to return 0 output tokens.
+        emit responseReceived("*(The agent awaits further instructions.)*", currentApiInteractionId);
+        return;
+    }
     
     QString rawJson = QJsonDocument(rootObj).toJson(QJsonDocument::Indented);
     emit networkError("Unexpected response format. Raw Google Response:\n" + rawJson);

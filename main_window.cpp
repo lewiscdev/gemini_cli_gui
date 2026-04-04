@@ -373,7 +373,12 @@ void MainWindow::handleNativeFunctionCalls(const QJsonArray& toolCalls) {
     isBatchProcessing = true;
     batchSystemFeedback.clear();
 
-    QString actionContext; // Build a summary of what tools the LLM just triggered
+    // Build a summary of what tools the LLM just triggered
+    QString actionContext;
+
+    // stutter fix variables
+    QString lastFunctionName = "";
+    QString lastTargetStr = "";
 
     for (int i = 0; i < toolCalls.size(); ++i) {
         QJsonObject callObj = toolCalls[i].toObject();
@@ -386,6 +391,13 @@ void MainWindow::handleNativeFunctionCalls(const QJsonArray& toolCalls) {
         else if (arguments.contains("local_path")) targetStr = arguments["local_path"].toString();
         else if (functionName == "git_manager") targetStr = "Git Batch Operations";
         else if (functionName == "take_screenshot") targetStr = "Active GUI";
+
+        // deny duplicate consecutive calls to the same tool with the same target, which is a common stuttering pattern in function calling loops
+        if (functionName == lastFunctionName && targetStr == lastTargetStr) {
+            continue; 
+        }
+        lastFunctionName = functionName;
+        lastTargetStr = targetStr;
 
         actionContext += QString("[Tool Invoked: %1 | Target: %2]\n").arg(functionName, targetStr);
 

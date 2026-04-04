@@ -150,7 +150,14 @@ void AgentActionManager::processFunctionCall(const QString& functionName, const 
             result = "System Error: Invalid directory.";
         } else {
             QDir dir(absoluteTarget);
-            result = QString("System [list_directory]:\n%1").arg(dir.entryList(QDir::AllEntries | QDir::NoDotAndDotDot).join("\n"));
+            QStringList entries = dir.entryList(QDir::AllEntries | QDir::NoDotAndDotDot);
+            
+            // empty directory edge case
+            if (entries.isEmpty()) {
+                result = "System [list_directory]: Directory is completely empty.";
+            } else {
+                result = QString("System [list_directory]:\n%1").arg(entries.join("\n"));
+            }
         }
         emit cleanTextReady(result);
         return;
