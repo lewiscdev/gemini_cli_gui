@@ -97,8 +97,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     if (!isExistingSession) {
             QString systemInstructions = AgentPromptBuilder::buildSystemInstruction(currentWorkspacePath);
-            saveInteractionToDb("system", "System Sandbox Initialized: " + currentWorkspacePath);
             QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
+            saveInteractionToDb("system", "System Sandbox Initialized: " + currentWorkspacePath);
             apiClient->sendPrompt(history, systemInstructions);
     } else {
         chatDisplay->append(formatChatBubble("system", "[System: Session Restored Successfully]", isDarkTheme));
@@ -257,8 +257,8 @@ void MainWindow::switchSession() {
 
         if (!isExistingSession) {
             QString systemInstructions = AgentPromptBuilder::buildSystemInstruction(currentWorkspacePath);
-            saveInteractionToDb("system", "System Sandbox Initialized: " + currentWorkspacePath);
             QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
+            saveInteractionToDb("system", "System Sandbox Initialized: " + currentWorkspacePath);
             apiClient->sendPrompt(history, systemInstructions);
         } else {
             chatDisplay->append(formatChatBubble("system", "[System: Switched to existing session]", isDarkTheme));
@@ -298,9 +298,9 @@ void MainWindow::handleSendClicked() {
         }
 
         chatDisplay->append(formatChatBubble("user", displayMsg, isDarkTheme));
+        QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
         saveInteractionToDb("user", displayMsg);
         
-        QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
         apiClient->sendPrompt(history, userInput, pendingAttachments); 
         
         inputField->clear();
@@ -373,20 +373,33 @@ void MainWindow::handleNativeFunctionCalls(const QJsonArray& toolCalls) {
     isBatchProcessing = true;
     batchSystemFeedback.clear();
 
+    QString actionContext; // Build a summary of what tools the LLM just triggered
+
     for (int i = 0; i < toolCalls.size(); ++i) {
         QJsonObject callObj = toolCalls[i].toObject();
         QString functionName = callObj["name"].toString();
         QJsonObject arguments = callObj["arguments"].toObject();
+
+        QString targetStr = "Unknown Target";
+        if (arguments.contains("target")) targetStr = arguments["target"].toString();
+        else if (arguments.contains("command")) targetStr = arguments["command"].toString();
+        else if (arguments.contains("local_path")) targetStr = arguments["local_path"].toString();
+        else if (functionName == "git_manager") targetStr = "Git Batch Operations";
+        else if (functionName == "take_screenshot") targetStr = "Active GUI";
+
+        actionContext += QString("[Tool Invoked: %1 | Target: %2]\n").arg(functionName, targetStr);
 
         agentController->processFunctionCall(functionName, arguments, currentWorkspacePath);
     }
 
     isBatchProcessing = false;
 
-    QString finalFeedback = batchSystemFeedback.trimmed();
+    QString finalFeedback = actionContext + "\n" + batchSystemFeedback.trimmed();
+    finalFeedback = finalFeedback.trimmed();
+
     if (!finalFeedback.isEmpty()) {
-        saveInteractionToDb("system", finalFeedback);
         QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
+        saveInteractionToDb("system", finalFeedback);
         
         // attachment pipeline injection
         QStringList systemAttachments;
@@ -433,9 +446,9 @@ void MainWindow::onAgentSystemFeedback(const QString& feedback) {
     if (isBatchProcessing) {
         batchSystemFeedback += apiFeedback + "\n\n";
     } else {
-        saveInteractionToDb("system", apiFeedback);
         QList<InteractionData> history = dbManager->getInteractions(currentSessionId);
-        
+        saveInteractionToDb("system", apiFeedback);
+
         QStringList systemAttachments;
         QString screenshotPath = QDir(currentWorkspacePath).absoluteFilePath("latest_agent_screenshot.png");
         

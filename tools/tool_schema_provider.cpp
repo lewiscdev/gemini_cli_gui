@@ -2,7 +2,7 @@
  * @file tool_schema_provider.cpp
  * @brief Implementation of the tool schema provider.
  *
- * Hardcodes the schemas for all local actions. ensures that parameters 
+ * Hardcodes the schemas for all local actions. Ensures that parameters 
  * perfectly match the arguments expected by the agent action manager.
  */
 
@@ -17,13 +17,14 @@
 
 QJsonArray ToolSchemaProvider::getAvailableTools() {
     QJsonArray toolsArray;
-    QJsonArray functionDeclarations;
 
-    // helper lambda to keep the schema construction readable
+    // Helper lambda to keep the schema construction readable
+    // FIXED: Formats each tool as a flat object with an explicit "type"
     auto addFunction = [&](const QString& name, const QString& description, const QJsonObject& properties, const QJsonArray& requiredParams) {
-        QJsonObject funcDecl;
-        funcDecl["name"] = name;
-        funcDecl["description"] = description;
+        QJsonObject toolObj;
+        toolObj["type"] = "function"; // Required flat schema identifier
+        toolObj["name"] = name;
+        toolObj["description"] = description;
 
         QJsonObject parameters;
         parameters["type"] = "OBJECT";
@@ -34,8 +35,10 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
         required.append("rationale"); // uniformly demand reasoning
         parameters["required"] = required;
 
-        funcDecl["parameters"] = parameters;
-        functionDeclarations.append(funcDecl);
+        toolObj["parameters"] = parameters;
+        
+        // Append directly to the root tools array
+        toolsArray.append(toolObj); 
     };
 
     // --- tool: write_file ---
@@ -98,10 +101,6 @@ QJsonArray ToolSchemaProvider::getAvailableTools() {
     screenProps["rationale"] = QJsonObject{{"type", "STRING"}, {"description", "why you need visual verification right now."}};
     addFunction("take_screenshot", "captures an image of the primary display to verify gui execution.", screenProps, {});
 
-    // wrap the definitions in the root tool object required by google
-    QJsonObject functionDeclarationsObj;
-    functionDeclarationsObj["function_declarations"] = functionDeclarations;
-    toolsArray.append(functionDeclarationsObj);
-
+    // Return the flat array directly (no wrapper required)
     return toolsArray;
 }
