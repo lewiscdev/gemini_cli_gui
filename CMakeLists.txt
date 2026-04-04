@@ -24,7 +24,7 @@ set(CMAKE_AUTOUIC ON) # processes designer files (.ui)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Sql)
 
 # Override specifically for RELEASE builds
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/bin/release)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/release/${PROJECT_VERSION})
 
 # define the executable and its source files using relative paths
 add_executable(GeminiNativeAgent WIN32
@@ -97,11 +97,4 @@ target_link_libraries(GeminiNativeAgent PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Sql
-)
-
-# Tell CMake what to do with the final executable named "MyApp"
-install(TARGETS GeminiNativeAgent
-    RUNTIME DESTINATION bin  # Executables (.exe) go to /bin
-    LIBRARY DESTINATION lib  # Shared libraries (.dll, .so) go to /lib
-    ARCHIVE DESTINATION lib  # Static libraries (.a, .lib) go to /lib
 )
